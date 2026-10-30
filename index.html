@@ -902,18 +902,28 @@ async function geminiError(r) {
 }
 // Model names change over time, so ask Google which Flash model this key can use and remember it.
 async function pickModel(key, fresh = false) {
-  if (!fresh && ls.get(AI_MODEL)) return ls.get(AI_MODEL);
+  if (!fresh && ls.get(AI_MODEL) && ls.get(AI_MODELS)) return ls.get(AI_MODEL);
   const r = await fetch(`${GEMINI}/models?pageSize=200&key=${encodeURIComponent(key)}`, { signal: timeout(15000) });
   if (!r.ok) throw await geminiError(r);
   const names = ((await r.json()).models || [])
     .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
     .map(m => m.name.replace(/^models\//, ""));
   const ver = n => parseFloat((n.match(/(\d+(?:\.\d+)?)/) || [])[1]) || 0;
-  const stable = names.filter(n => /flash/.test(n) && !/preview|exp|tts|image|audio|live|thinking|embed|lite|8b/.test(n)).sort((a, b) => ver(b) - ver(a));
-  const pick = names.includes("gemini-flash-latest") ? "gemini-flash-latest" : stable[0] || names.find(n => /flash/.test(n));
+  const usable = names.filter(n => /flash/.test(n) && !/preview|exp|tts|image|audio|live|thinking|embed|8b/.test(n)).sort((a, b) => ver(b) - ver(a));
+  ls.set(AI_MODELS, JSON.stringify(usable)); // offered in Settings → Account
+  const stable = usable.filter(n => !/lite/.test(n));
+  const pick = names.includes("gemini-flash-latest") ? "gemini-flash-latest" : stable[0] || usable[0] || names.find(n => /flash/.test(n));
   if (!pick) throw new Error("This key can't use any Gemini Flash model.");
   ls.set(AI_MODEL, pick);
   return pick;
+}
+const AI_MODELS = "macro-ledger-gemini-models";
+function modelOptions() {
+  let list = [];
+  try { list = JSON.parse(ls.get(AI_MODELS) || "[]"); } catch {}
+  const cur = ls.get(AI_MODEL);
+  if (cur && !list.includes(cur)) list.unshift(cur);
+  return list.map(n => `<option value="${esc(n)}"${n === cur ? " selected" : ""}>${esc(n)}${/lite/.test(n) ? " (fastest)" : ""}</option>`).join("");
 }
 function aiPrompt(text) {
   return `You are a careful nutrition estimator for a personal food log.
@@ -942,7 +952,8 @@ async function aiEstimate(text) {
     method: "POST", headers: { "Content-Type": "application/json" }, signal: timeout(90000),
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: aiPrompt(text) }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.2, ...(think ? { thinkingConfig: think } : {}) },
+      // No temperature: Gemini 3 models can loop below their default of 1.0. The token cap stops any runaway answer.
+      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2048, ...(think ? { thinkingConfig: think } : {}) },
     }),
   });
   const attempt = async model => {
@@ -959,6 +970,7 @@ async function aiEstimate(text) {
   if (r.status === 404) { ls.set(AI_THINK, null); r = await attempt(await pickModel(key, true)); } // remembered model was retired
   if (!r.ok) throw await geminiError(r);
   const j = await r.json();
+  if ((j.candidates || [])[0]?.finishReason === "MAX_TOKENS") throw new Error("Gemini's answer ran too long and was cut off. Try again, or pick a different model in Settings → Account.");
   const raw = ((j.candidates || [])[0]?.content?.parts || []).map(p => p.text || "").join("").replace(/^\s*```(?:json)?|```\s*$/g, "");
   let data;
   try { data = JSON.parse(raw); } catch { throw new Error("Gemini's answer couldn't be read. Try again."); }
@@ -979,11 +991,11 @@ async function estimateAI(text) {
     if (!items.length) { setMsg("Gemini didn't find any food in that. Try describing it differently.", true); return; }
     state.pending = [...(state.pending || []), ...items];
     $("missed").innerHTML = "";
-    setMsg("AI estimates are approximate. Check the amounts, then add.");
+    setMsg(`Done in ${Math.round((Date.now() - started) / 1000)}s with ${ls.get(AI_MODEL)}. AI estimates are approximate; check the amounts, then add.`);
     renderPreview();
   } catch (e) {
     setMsg(e.name === "TimeoutError" || e.name === "AbortError"
-      ? "Gemini didn't answer within 90 seconds. It may be busy; try again, or switch to Built-in list."
+      ? `${ls.get(AI_MODEL) || "Gemini"} didn't answer within 90 seconds. Try a Flash-Lite model in Settings → Account, or switch to Built-in list.`
       : e.message || "Couldn't reach Gemini. Check your connection.", true);
   } finally {
     clearInterval(ticker);
@@ -1430,7 +1442,8 @@ function renderAccount() {
   $("account").innerHTML = `<div class="sect-head"><h2 class="sect-title">Sign-in and sync</h2></div>${top}
     <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">AI estimates</h3><span class="hint">Optional and free. Lets you describe food in your own words.</span></div>
     ${aiKey()
-      ? `<div class="row-actions"><span>Gemini is connected on this device (key ending ${esc(aiKey().slice(-4))}).</span><button class="ghost" id="aiRemove">Remove key</button></div>`
+      ? `<div class="row-actions"><span>Gemini is connected on this device (key ending ${esc(aiKey().slice(-4))}).</span><button class="ghost" id="aiRemove">Remove key</button></div>
+        <label class="field" style="max-width:360px">Model (Flash-Lite answers fastest)<select id="aiModelSel" style="border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--bg);color:var(--ink)">${modelOptions()}</select></label>`
       : `<p class="hint" style="margin:0">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> (sign in with Google → <b>Create API key</b>), then paste it here. It's saved on this device only, so add it on each device. The free tier has daily limits, and Google may use what you send to improve its products.</p>
         <form class="searchrow" id="aiForm"><input id="aiKeyInput" type="password" autocomplete="off" required placeholder="Paste your Gemini API key" aria-label="Gemini API key"><button class="primary" type="submit">Save key</button></form>`}
     <div class="msg" id="aiMsg" role="status"></div>
@@ -1486,7 +1499,7 @@ async function saveAiKey() {
   }
 }
 function removeAiKey() {
-  ls.set(AI_KEY, null); ls.set(AI_MODEL, null); ls.set(EST_MODE, null); ls.set(AI_THINK, null);
+  ls.set(AI_KEY, null); ls.set(AI_MODEL, null); ls.set(EST_MODE, null); ls.set(AI_THINK, null); ls.set(AI_MODELS, null);
   renderAccount(); renderEstMode();
   authMsg("aiMsg", "Key removed from this device.");
 }
@@ -1655,6 +1668,7 @@ document.addEventListener("submit", e => {
 });
 document.addEventListener("change", e => {
   if (e.target.id === "importFile" && e.target.files[0]) { importBackup(e.target.files[0]); e.target.value = ""; }
+  if (e.target.id === "aiModelSel") { ls.set(AI_MODEL, e.target.value); ls.set(AI_THINK, null); authMsg("aiMsg", `Estimates will use ${e.target.value}.`); }
 });
 
 $("prevDay").onclick = () => { state.histDate = shiftKey(state.histDate, -1); render(); };
