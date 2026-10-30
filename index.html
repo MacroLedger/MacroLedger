@@ -288,6 +288,23 @@ details.meal > .items { border-left: 2px solid var(--accent-soft); margin-left: 
 .dialog a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .dialog { animation: none; } }
 
+/* Guided tour: a spotlight cut out of a dim layer, and a bubble explaining what's lit */
+.tour-layer { position: fixed; inset: 0; z-index: 60; }
+.tour-hole { position: fixed; border-radius: 12px; pointer-events: none; box-shadow: 0 0 0 200vmax rgb(10 8 18 / .64);
+  outline: 2px solid var(--accent); outline-offset: 2px; transition: left .35s cubic-bezier(.2, .8, .2, 1), top .35s cubic-bezier(.2, .8, .2, 1), width .35s cubic-bezier(.2, .8, .2, 1), height .35s cubic-bezier(.2, .8, .2, 1); }
+.tour-hole.center { left: 50% !important; top: 50% !important; width: 0 !important; height: 0 !important; outline-color: transparent; }
+.tour-tip { position: fixed; z-index: 61; width: min(340px, calc(100vw - 24px)); background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 16px; display: grid; gap: 8px; box-shadow: 0 16px 48px rgb(0 0 0 / .35); transition: left .35s cubic-bezier(.2, .8, .2, 1), top .35s cubic-bezier(.2, .8, .2, 1); }
+.tour-tip .where { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.tour-tip h3 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 1.1rem; letter-spacing: -0.01em; }
+.tour-tip p { margin: 0; color: var(--muted); font-size: .9rem; line-height: 1.45; }
+.tour-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; }
+.tour-foot .count { font-size: .78rem; color: var(--muted); font-family: var(--f-mono); }
+.tour-foot .btns { display: flex; gap: 6px; }
+.tour-foot .primary { padding: 7px 16px; }
+.tour-foot .ghost { padding: 6px 12px; }
+@media (prefers-reduced-motion: reduce) { .tour-hole, .tour-tip { transition: none; } }
+
 footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; display: flex; gap: 14px; align-items: center; font-size: .9rem; box-shadow: 0 6px 24px rgb(0 0 0 / .2); max-width: calc(100% - 32px); z-index: 20; }
 .toast button { background: none; border: 0; color: inherit; font-weight: 700; text-decoration: underline; }
@@ -1805,6 +1822,8 @@ function renderAccount() {
       : `<p class="hint" style="margin:0">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> (sign in with Google → <b>Create API key</b>), then paste it here. It's saved on this device only, so add it on each device. The free tier has daily limits, and Google may use what you send to improve its products.</p>
         <form class="searchrow" id="aiForm"><input id="aiKeyInput" type="password" autocomplete="off" required placeholder="Paste your Gemini API key" aria-label="Gemini API key"><button class="primary" type="submit">Save key</button></form>`}
     <div class="msg" id="aiMsg" role="status"></div>
+    <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">App tour</h3><span class="hint">A quick walk through every page of the app.</span></div>
+    <div class="row-actions"><button class="ghost" id="tourBtn">Take the tour</button></div>
     <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">Backup</h3><span class="hint">Download your whole log as a file, or load one back in. Loading only adds entries you don't already have.</span></div>
     <div class="row-actions">
       <button class="ghost" id="exportBtn">Download backup</button>
@@ -1954,6 +1973,7 @@ function skipGate() {
   try { sessionStorage.setItem(SKIP_GATE, "1"); } catch {}
   closeOverlay();
   if (!ls.get(onboardedKey())) showOnboarding(1); // first time on this device without an account: same setup
+  else if (!ls.get(TOURED)) startTour();           // setup done earlier, but the tour hasn't been seen yet
 }
 // New accounts: step 1 sets goals, step 2 walks through getting a free Gemini key
 function showOnboarding(step = 1) {
@@ -1998,8 +2018,108 @@ function onboardingGoals() {
 function finishOnboarding() {
   ls.set(onboardedKey(), "1");
   closeOverlay();
-  toast("You're all set. Log your first meal on the Log tab.");
+  startTour(); // new users get the guided tour straight after setup
 }
+
+/* ---------- Guided tour ---------- */
+// Each stop opens a page (switching ledger if needed), lights one part of it and explains it.
+const TOUR = [
+  { where: "Welcome", title: "A quick tour", text: "Here's a 2-minute walk through the app, page by page. Use Next and Back, or Skip tour any time. You can replay it from Settings → Account." },
+  { mode: "main", tab: "home", target: "#tabs", where: "MacroLedger", title: "Three pages", text: "Home shows what's left today, Log is where you add food, and History lets you look back at any day." },
+  { mode: "main", tab: "home", target: "#home-ring", where: "Home", title: "Calories left today", text: "The ring fills as you eat. The big number is what's left of your daily calorie goal, or how far over you are." },
+  { mode: "main", tab: "home", target: "#home-bars", where: "Home", title: "Your macros", text: "Protein, carbs, fat, fiber and added sugar: eaten vs your goal. Limits say how much is left; protein and fiber say how much to go." },
+  { mode: "main", tab: "home", target: "#home-total", where: "Home", title: "Today's total", text: "A nutrition-label summary of everything you've eaten today, plus calories for each meal. Tap a meal to jump to the Log." },
+  { mode: "main", tab: "log", target: "#foodText", where: "Log", title: "Type what you ate", text: "Write it the way you'd say it, like “2 rotis and a bowl of dal”. Amounts help. Then press Estimate macros." },
+  { mode: "main", tab: "log", target: "#meals", where: "Log", title: "Pick the meal", text: "Choose Breakfast, Lunch, Snacks or Dinner before adding. With a Gemini key, you can also switch between AI and the built-in list here." },
+  { mode: "main", tab: "log", target: "#estimateBtn", where: "Log", title: "Check, then add", text: "You'll see the estimate first. Adjust amounts or remove items, then add them to your log. Enter numbers myself is there for packaged foods with a label." },
+  { mode: "main", tab: "log", target: ".search", where: "Log", title: "Search food databases", text: "Can't find something? Search packaged foods and ingredients, pick a result and set the grams." },
+  { mode: "main", tab: "log", target: "#log-list", where: "Log", title: "Today's meals", text: "Each meal shows its totals. Tap it to see the foods inside, and the × to remove one (there's an Undo)." },
+  { mode: "main", tab: "log", target: "#recs", where: "Log", title: "Suggestions", text: "Once you've logged a few days, this suggests foods you often eat on this weekday that fit what's left of your calories." },
+  { mode: "main", tab: "history", target: ".datenav", where: "History", title: "Look back", text: "Move between days with the arrows, or tap a day in the week strip below." },
+  { mode: "main", tab: "history", target: "#week", where: "History", title: "Your week at a glance", text: "Each column is a day's calories against your goal line. Tap one to open that day's meals and totals." },
+  { mode: "main", tab: "home", target: "#ledgerBtn", where: "Switch ledger", title: "Track your weight", text: "This button opens WeightLedger, the bodyweight side of the app. Inside it, the same button brings you back here." },
+  { mode: "weight", tab: "whome", target: "#home-weight", where: "WeightLedger · Home", title: "Current vs goal", text: "Your latest weight, your goal and how much is left, with a progress bar. Set the goal in Settings → Goals." },
+  { mode: "weight", tab: "whome", target: "#wStats", where: "WeightLedger · Home", title: "Weekly averages", text: "Daily weight jumps around. The weekly average (Monday to Sunday) and its change from last week show the real trend." },
+  { mode: "weight", tab: "whome", target: "#wChart", where: "WeightLedger · Home", title: "Trend chart", text: "Dots are your weigh-ins, lines are weekly averages, and the dashed line is your goal. Hover or tap a dot for details." },
+  { mode: "weight", tab: "wlog", target: "#wForm", where: "WeightLedger · Log", title: "Morning weigh-in", text: "Weigh yourself after waking up, before eating, and log it here in kg. You can pick a past date if you forgot a day." },
+  { mode: "weight", tab: "whist", target: "#wWeeks", where: "WeightLedger · History", title: "Week by week", text: "Every week's average and how much it changed from the week before." },
+  { mode: "weight", tab: "whome", target: "#modeBtn", where: "Settings", title: "Settings", text: "The gear opens Goals (daily macros and bodyweight) and Account (sign-in, Gemini key and backups). The home button there brings you back." },
+  { mode: "main", tab: "home", where: "Done", title: "You're ready", text: "Start by logging your next meal on the Log tab. You can replay this tour any time from Settings → Account." },
+];
+let tourI = -1;
+const TOURED = "macro-ledger-toured"; // set once the tour has been shown on this device
+function startTour() {
+  ls.set(TOURED, "1");
+  closeOverlay();
+  if (!$("tourLayer")) {
+    document.body.insertAdjacentHTML("beforeend", `<div class="tour-layer" id="tourLayer"><div class="tour-hole center" id="tourHole"></div></div>
+      <div class="tour-tip" id="tourTip" role="dialog" aria-modal="true" aria-live="polite"></div>`);
+  }
+  tourI = 0;
+  showTourStep();
+}
+function endTour() {
+  tourI = -1;
+  $("tourLayer") && $("tourLayer").remove();
+  $("tourTip") && $("tourTip").remove();
+  if (state.mode !== "main" || state.page !== "home") applyMode("main", "home");
+}
+function tourGo(d) {
+  const next = tourI + d;
+  if (next < 0) return;
+  if (next >= TOUR.length) { endTour(); toast("Enjoy! Your log starts on the Log tab."); return; }
+  tourI = next;
+  showTourStep();
+}
+function showTourStep() {
+  const s = TOUR[tourI], last = tourI === TOUR.length - 1;
+  if (s.mode && state.mode !== s.mode) applyMode(s.mode, s.tab);
+  else if (s.tab && currentTab() !== s.tab) switchTab(s.tab, false);
+  $("tourTip").innerHTML = `<span class="where">${s.where}</span><h3 id="tourTitle">${s.title}</h3><p>${s.text}</p>
+    <div class="tour-foot"><span class="count">${tourI + 1} / ${TOUR.length}</span>
+      <div class="btns">${last ? "" : `<button class="linkbtn" id="tourSkip">Skip tour</button>`}${tourI > 0 ? `<button class="ghost" id="tourBack">Back</button>` : ""}<button class="primary" id="tourNext">${last ? "Finish" : tourI === 0 ? "Start" : "Next"}</button></div>
+    </div>`;
+  $("tourTip").setAttribute("aria-labelledby", "tourTitle");
+  const el = s.target && document.querySelector(s.target);
+  if (el && !el.closest(".top")) el.scrollIntoView({ block: "center", behavior: "auto" });
+  requestAnimationFrame(() => { placeTour(); if ($("tourNext")) $("tourNext").focus(); }); // the tour may have been closed meanwhile
+}
+function placeTour() {
+  if (tourI < 0) return;
+  const s = TOUR[tourI], hole = $("tourHole"), tip = $("tourTip");
+  const el = s.target && document.querySelector(s.target);
+  const tw = tip.offsetWidth, th = tip.offsetHeight, m = 12;
+  if (!el) {
+    hole.classList.add("center");
+    tip.style.left = `${(innerWidth - tw) / 2}px`; tip.style.top = `${Math.max(m, (innerHeight - th) / 2)}px`;
+    return;
+  }
+  hole.classList.remove("center");
+  const r = el.getBoundingClientRect(), pad = 6;
+  const top = Math.max(4, r.top - pad), bottom = Math.min(innerHeight - 4, r.bottom + pad); // keep tall targets on screen
+  Object.assign(hole.style, { left: `${r.left - pad}px`, top: `${top}px`, width: `${r.width + 2 * pad}px`, height: `${Math.max(0, bottom - top)}px` });
+  // Bubble below the spotlight if it fits, else above, else pinned to the bottom of the screen
+  let y = bottom + 14;
+  if (y + th > innerHeight - m) y = top - 14 - th;
+  if (y < m) y = innerHeight - th - m;
+  const x = Math.min(Math.max(m, r.left + r.width / 2 - tw / 2), innerWidth - tw - m);
+  tip.style.left = `${x}px`; tip.style.top = `${y}px`;
+}
+document.addEventListener("click", e => {
+  if (tourI < 0) return;
+  const id = e.target.id;
+  if (id === "tourNext") tourGo(1);
+  else if (id === "tourBack") tourGo(-1);
+  else if (id === "tourSkip") endTour();
+});
+document.addEventListener("keydown", e => {
+  if (tourI < 0) return;
+  if (e.key === "Escape") endTour();
+  else if (e.key === "ArrowRight") tourGo(1);
+  else if (e.key === "ArrowLeft") tourGo(-1);
+});
+window.addEventListener("resize", () => placeTour());
+window.addEventListener("scroll", () => placeTour(), { passive: true });
 
 /* ---------- Toast ---------- */
 let toastTimer = null;
@@ -2144,6 +2264,7 @@ document.addEventListener("click", e => {
   if (t.id === "obSkipAi") finishOnboarding();
   if (t.id === "obBack") showOnboarding(1);
   if (t.id === "aiRemove") removeAiKey();
+  if (t.id === "tourBtn") { startTour(); return; }
   if (t.id === "setWeightGoal") { switchMode("settings", "goals").then(() => $("goal-weight") && $("goal-weight").focus()); return; }
   const est = t.closest("[data-est]");
   if (est) { ls.set(EST_MODE, est.dataset.est === "list" ? "list" : null); renderEstMode(); }
