@@ -56,7 +56,7 @@ button, summary.meal-head { transition: box-shadow .15s ease, background-color .
 }
 
 /* Header + tabs */
-.top { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+.top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); padding-block: 10px; margin-top: -10px; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
 .brand { font-family: var(--f-display); font-weight: 800; font-size: 1.5rem; letter-spacing: -0.02em; margin: 0; }
@@ -65,7 +65,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .tab { border: 0; background: transparent; border-radius: 999px; padding: 6px 18px; font-weight: 600; color: var(--muted); }
 .tab:hover { color: var(--ink); }
 .tab[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
-.hdr-actions { display: flex; gap: 6px; }
+.brandbox { justify-self: start; display: flex; align-items: center; gap: 10px; }
+.modebtn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); display: grid; place-items: center; padding: 0; }
+.modebtn svg, .morph svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* The icon that flies to the middle of the screen when switching between the app and settings */
+.morph { position: fixed; z-index: 50; width: 40px; height: 40px; display: grid; place-items: center; color: var(--accent); pointer-events: none; }
 .ghost { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 14px; font-weight: 500; }
 .datenav { display: flex; align-items: center; gap: 6px; }
 .datenav .label { min-width: 9.5em; text-align: center; font-weight: 600; }
@@ -229,7 +233,8 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
 .toast button { background: none; border: 0; color: inherit; font-weight: 700; text-decoration: underline; }
 
 @media (max-width: 640px) {
-  .tabs { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+  .top { grid-template-columns: 1fr; }
+  .tabs { grid-column: 1; grid-row: 2; justify-self: stretch; }
   .tab { flex: 1; padding-inline: 8px; }
   .home-split { grid-template-columns: 1fr; }
   .summary { grid-template-columns: 1fr; padding: 16px; }
@@ -244,16 +249,11 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
 <body>
 <div class="wrap">
   <header class="top">
-    <h1 class="brand">Macro<span>Ledger</span></h1>
-    <nav class="tabs" aria-label="Pages">
-      <button class="tab" data-go="home" aria-current="page">Home</button>
-      <button class="tab" data-go="log">Log</button>
-      <button class="tab" data-go="history">History</button>
-    </nav>
-    <div class="hdr-actions">
-      <button class="ghost" id="goalsBtn" aria-expanded="false" aria-controls="goals">Goals</button>
-      <button class="ghost" id="accountBtn" aria-expanded="false" aria-controls="account">Account</button>
+    <div class="brandbox">
+      <button class="modebtn" id="modeBtn" aria-label="Settings"></button>
+      <h1 class="brand">Macro<span>Ledger</span></h1>
     </div>
+    <nav class="tabs" id="tabs" aria-label="Pages"></nav>
   </header>
 
   <div class="banner" id="syncBanner" hidden>
@@ -261,19 +261,27 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
     <button class="primary" id="bannerSignIn">Sign in</button>
   </div>
 
-  <section class="card" id="goals" hidden aria-label="Daily goals">
-    <div class="sect-head">
-      <h2 class="sect-title">Daily goals</h2>
-      <span class="hint">Calories, carbs, fat and added sugar are limits. Protein and fiber are targets to reach.</span>
-    </div>
-    <form id="goalsForm" class="mgrid"></form>
-    <div class="row-actions">
-      <button class="primary" id="saveGoals" type="button">Save goals</button>
-      <button class="linkbtn" id="cancelGoals" type="button">Cancel</button>
-    </div>
-  </section>
+  <!-- SETTINGS: goals -->
+  <div class="page" id="page-goals" hidden>
+    <div class="page-head"><div><h2 class="page-title">Goals</h2><div class="hint">What you aim for each day</div></div></div>
+    <section class="card" id="goals" aria-label="Daily goals">
+      <div class="sect-head">
+        <h2 class="sect-title">Daily goals</h2>
+        <span class="hint">Calories, carbs, fat and added sugar are limits. Protein and fiber are targets to reach.</span>
+      </div>
+      <form id="goalsForm" class="mgrid"></form>
+      <div class="row-actions">
+        <button class="primary" id="saveGoals" type="button">Save goals</button>
+        <button class="linkbtn" id="cancelGoals" type="button">Undo changes</button>
+      </div>
+    </section>
+  </div>
 
-  <section class="card" id="account" hidden aria-label="Account and backup"></section>
+  <!-- SETTINGS: account -->
+  <div class="page" id="page-account" hidden>
+    <div class="page-head"><div><h2 class="page-title">Account</h2><div class="hint">Sign-in, syncing and backups</div></div></div>
+    <section class="card" id="account" aria-label="Account and backup"></section>
+  </div>
 
   <!-- HOME: what's left today and today's totals -->
   <div class="page" id="page-home">
@@ -368,6 +376,7 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
   </footer>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="morph" id="morph" hidden aria-hidden="true"></div>
 
 <script>
 /* ===== Your settings — fill these in (see SETUP.md) ===== */
@@ -1190,7 +1199,7 @@ function renderNote() {
     ? `Saved to your account (${store.user.email}) and synced across your devices.`
     : SYNC_READY ? "Saved on this device only. Sign in to sync it to your other devices."
     : "Saved on this device only. Set up sync in SETUP.md to use it across devices.";
-  $("syncBanner").hidden = !(SYNC_READY && store.mode !== "cloud");
+  $("syncBanner").hidden = !(SYNC_READY && store.mode !== "cloud") || state.mode === "settings";
 }
 
 /* ---------- Suggestions from your own history ---------- */
@@ -1272,24 +1281,15 @@ function renderRecs() {
 }
 
 /* ---------- Goals ---------- */
-function openPanel(id, open) {
-  $(id).hidden = !open;
-  $(id + "Btn").setAttribute("aria-expanded", String(open));
-}
-function openGoals(open) {
-  openPanel("goals", open);
-  if (open) {
-    openPanel("account", false);
-    $("goalsForm").innerHTML = NUTS.map(n => `<label class="field">${n.label} (${n.unit})<input id="goal-${n.k}" type="number" min="0" step="${n.k === "kcal" ? 10 : 1}" inputmode="decimal" value="${state.goals[n.k]}"></label>`).join("");
-    $("goal-kcal").focus();
-  }
+function renderGoalsForm() {
+  $("goalsForm").innerHTML = NUTS.map(n => `<label class="field">${n.label} (${n.unit})<input id="goal-${n.k}" type="number" min="0" step="${n.k === "kcal" ? 10 : 1}" inputmode="decimal" value="${state.goals[n.k]}"></label>`).join("");
 }
 function saveGoals() {
   for (const n of NUTS) {
     const v = Number($("goal-" + n.k).value);
     if (Number.isFinite(v) && v >= 0) state.goals[n.k] = v;
   }
-  store.saveGoals(); openGoals(false); render(); toast("Goals saved");
+  store.saveGoals(); render(); renderGoalsForm(); toast("Goals saved");
 }
 
 /* ---------- Account and backup ---------- */
@@ -1310,7 +1310,7 @@ function renderAccount() {
       <button class="linkbtn" type="button" id="magicBtn">Email me a sign-in link instead</button>
     </div>
     <div class="msg" id="signInMsg" role="status"></div>`;
-  $("account").innerHTML = `<div class="sect-head"><h2 class="sect-title">Account</h2></div>${top}
+  $("account").innerHTML = `<div class="sect-head"><h2 class="sect-title">Sign-in and sync</h2></div>${top}
     <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">Backup</h3><span class="hint">Download your whole log as a file, or load one back in. Loading only adds entries you don't already have.</span></div>
     <div class="row-actions">
       <button class="ghost" id="exportBtn">Download backup</button>
@@ -1398,29 +1398,95 @@ function toast(text, undo) {
 }
 
 /* ---------- Pages ---------- */
+// Two modes share the tab bar: the app (Home / Log / History) and settings (Goals / Account).
 const PAGES = ["home", "log", "history"];
-function go(page, animate = true) {
-  const prev = state.page;
-  state.page = page;
-  for (const p of PAGES) $("page-" + p).hidden = p !== page;
-  const el = $("page-" + page);
+const SET_TABS = ["goals", "account"];
+const TAB_LABELS = { home: "Home", log: "Log", history: "History", goals: "Goals", account: "Account" };
+const ICONS = {
+  gear: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  home: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+};
+state.mode = "main";
+state.setTab = "goals";
+
+const currentTab = () => state.mode === "main" ? state.page : state.setTab;
+function renderTabs() {
+  const main = state.mode === "main", list = main ? PAGES : SET_TABS, cur = currentTab();
+  $("tabs").setAttribute("aria-label", main ? "Pages" : "Settings");
+  $("tabs").innerHTML = list.map(k => `<button class="tab" data-${main ? "go" : "set"}="${k}"${k === cur ? ' aria-current="page"' : ""}>${TAB_LABELS[k]}</button>`).join("");
+  $("modeBtn").innerHTML = ICONS[main ? "gear" : "home"];
+  $("modeBtn").setAttribute("aria-label", main ? "Settings" : "Back to Home");
+}
+function showPages() {
+  const cur = currentTab();
+  for (const p of [...PAGES, ...SET_TABS]) $("page-" + p).hidden = p !== cur;
+}
+// Switch tab within the current mode; the new page slides in from the side it sits on.
+function switchTab(next, animate = true) {
+  const order = state.mode === "main" ? PAGES : SET_TABS, prev = currentTab();
+  if (state.mode === "main") state.page = next; else state.setTab = next;
+  showPages(); renderTabs();
+  const el = $("page-" + next);
   el.classList.remove("slide-from-right", "slide-from-left");
-  if (animate && prev !== page) {
+  if (animate && prev !== next) {
     void el.offsetWidth; // restart the animation if it was mid-way
-    el.classList.add(PAGES.indexOf(page) > PAGES.indexOf(prev) ? "slide-from-right" : "slide-from-left");
+    el.classList.add(order.indexOf(next) > order.indexOf(prev) ? "slide-from-right" : "slide-from-left");
     el.addEventListener("animationend", () => el.classList.remove("slide-from-right", "slide-from-left"), { once: true });
   }
-  document.querySelectorAll(".tab").forEach(t => {
-    if (t.dataset.go === page) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
-  });
   window.scrollTo(0, 0);
+}
+const go = (page, animate = true) => switchTab(page, animate);
+
+function applyMode(to, tab) {
+  state.mode = to;
+  if (to === "settings") { state.setTab = tab || "goals"; renderGoalsForm(); renderAccount(); }
+  else state.page = "home"; // the home button always lands on Home
+  showPages(); renderTabs(); renderNote();
+  window.scrollTo(0, 0);
+}
+
+// Gear <-> home: everything fades, the tapped icon flies to the middle and grows, then the other side appears.
+let morphing = false;
+async function switchMode(to, tab) {
+  if (morphing) return;
+  if (state.mode === to) { if (tab) switchTab(tab); return; }
+  const btn = $("modeBtn"), app = document.querySelector(".wrap"), ghost = $("morph");
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !ghost.animate) { applyMode(to, tab); return; }
+  morphing = true;
+  const r = btn.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const dx = innerWidth / 2 - cx, dy = innerHeight / 2 - cy;
+  const spin = to === "settings" ? 180 : 0;
+  ghost.innerHTML = ICONS[to === "settings" ? "gear" : "home"];
+  Object.assign(ghost.style, { left: `${cx - 20}px`, top: `${cy - 20}px` });
+  ghost.hidden = false;
+  btn.style.visibility = "hidden";
+
+  const fadeOut = app.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: "ease", fill: "forwards" });
+  const centre = `translate(${dx}px, ${dy}px) scale(4) rotate(${spin}deg)`;
+  const fly = ghost.animate([{ transform: "none" }, { transform: centre }], { duration: 560, easing: "cubic-bezier(.2, .8, .2, 1)", fill: "forwards" });
+  await fly.finished;
+
+  applyMode(to, tab);
+  const out = ghost.animate([{ transform: centre, opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(6) rotate(${spin}deg)`, opacity: 0 }],
+    { duration: 320, delay: 140, easing: "ease-in", fill: "forwards" });
+  const fadeIn = app.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 340, delay: 220, easing: "ease", fill: "both" });
+  await Promise.all([out.finished, fadeIn.finished]);
+
+  for (const a of [fadeOut, fly, out, fadeIn]) a.cancel();
+  ghost.hidden = true;
+  btn.style.visibility = "";
+  morphing = false;
 }
 
 /* ---------- Events ---------- */
 document.addEventListener("click", e => {
   const t = e.target;
+  if (t.closest("#modeBtn")) { switchMode(state.mode === "main" ? "settings" : "main"); return; }
   const goBtn = t.closest("[data-go]");
   if (goBtn) { go(goBtn.dataset.go); return; }
+  const setBtn = t.closest("[data-set]");
+  if (setBtn) { switchTab(setBtn.dataset.set); return; }
   const rm = t.closest("[data-remove]");
   if (rm) { removeEntry(rm.dataset.remove, rm.dataset.date); return; }
   const sr = t.closest("[data-search]");
@@ -1447,11 +1513,9 @@ document.addEventListener("change", e => {
 $("prevDay").onclick = () => { state.histDate = shiftKey(state.histDate, -1); render(); };
 $("nextDay").onclick = () => { if (state.histDate < todayKey()) { state.histDate = shiftKey(state.histDate, 1); render(); } };
 $("week").addEventListener("click", e => { const b = e.target.closest("[data-day]"); if (b && !b.disabled) { state.histDate = b.dataset.day; render(); } });
-$("goalsBtn").onclick = () => openGoals($("goals").hidden);
-$("accountBtn").onclick = () => { const open = $("account").hidden; if (open) openGoals(false); openPanel("account", open); };
-$("bannerSignIn").onclick = () => { openGoals(false); openPanel("account", true); $("account").scrollIntoView({ behavior: "smooth" }); setTimeout(() => $("signInEmail") && $("signInEmail").focus(), 300); };
+$("bannerSignIn").onclick = async () => { await switchMode("settings", "account"); if ($("signInEmail")) $("signInEmail").focus(); };
 $("saveGoals").onclick = saveGoals;
-$("cancelGoals").onclick = () => openGoals(false);
+$("cancelGoals").onclick = renderGoalsForm;
 $("goalsForm").addEventListener("submit", e => { e.preventDefault(); saveGoals(); });
 $("estimateBtn").onclick = estimate;
 $("foodText").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) estimate(); });
@@ -1505,6 +1569,7 @@ $("manualAdd").onclick = () => {
   toast(`Added ${name} to ${state.meal}`);
 };
 
+renderTabs();
 { const h = location.hash.slice(1); if (PAGES.includes(h)) go(h, false); }
 store.init();
 </script>
