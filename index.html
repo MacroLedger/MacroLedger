@@ -930,14 +930,33 @@ If the text contains no food, reply {"items":[]}.
 Food description:
 ${text.slice(0, 2000)}`;
 }
+// Newer Gemini models think before answering (medium or high by default), which can take a minute or more.
+// Food estimates need little reasoning, so ask for the least thinking each model accepts:
+// thinkingLevel for Gemini 3 and later, thinkingBudget for 2.5, nothing for older models.
+const AI_THINK = "macro-ledger-gemini-think";
+const THINK_OPTS = [{ thinkingLevel: "minimal" }, { thinkingLevel: "low" }, { thinkingBudget: 0 }, null];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function aiEstimate(text) {
   const key = aiKey();
-  const call = model => fetch(`${GEMINI}/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, signal: timeout(60000),
-    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: aiPrompt(text) }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } }),
+  const call = (model, think) => fetch(`${GEMINI}/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, signal: timeout(90000),
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: aiPrompt(text) }] }],
+      generationConfig: { responseMimeType: "application/json", temperature: 0.2, ...(think ? { thinkingConfig: think } : {}) },
+    }),
   });
-  let r = await call(await pickModel(key));
-  if (r.status === 404) r = await call(await pickModel(key, true)); // remembered model was retired
+  const attempt = async model => {
+    let i = Math.min(Number(ls.get(AI_THINK)) || 0, THINK_OPTS.length - 1), r;
+    for (; i < THINK_OPTS.length; i++) {
+      r = await call(model, THINK_OPTS[i]);
+      if (r.status === 503) { await sleep(2000); r = await call(model, THINK_OPTS[i]); } // briefly overloaded
+      if (r.status !== 400 || i === THINK_OPTS.length - 1) break; // 400: this model rejects that setting, try the next
+    }
+    if (r.ok) ls.set(AI_THINK, String(i));
+    return r;
+  };
+  let r = await attempt(await pickModel(key));
+  if (r.status === 404) { ls.set(AI_THINK, null); r = await attempt(await pickModel(key, true)); } // remembered model was retired
   if (!r.ok) throw await geminiError(r);
   const j = await r.json();
   const raw = ((j.candidates || [])[0]?.content?.parts || []).map(p => p.text || "").join("").replace(/^\s*```(?:json)?|```\s*$/g, "");
@@ -951,7 +970,10 @@ async function aiEstimate(text) {
 }
 async function estimateAI(text) {
   $("estimateBtn").disabled = true;
-  setMsg("Asking Gemini…");
+  const started = Date.now();
+  const tick = () => setMsg(`Asking Gemini… ${Math.round((Date.now() - started) / 1000)}s`);
+  tick();
+  const ticker = setInterval(tick, 1000);
   try {
     const items = await aiEstimate(text);
     if (!items.length) { setMsg("Gemini didn't find any food in that. Try describing it differently.", true); return; }
@@ -960,8 +982,11 @@ async function estimateAI(text) {
     setMsg("AI estimates are approximate. Check the amounts, then add.");
     renderPreview();
   } catch (e) {
-    setMsg(e.name === "TimeoutError" || e.name === "AbortError" ? "Gemini took too long to answer. Try again." : e.message || "Couldn't reach Gemini. Check your connection.", true);
+    setMsg(e.name === "TimeoutError" || e.name === "AbortError"
+      ? "Gemini didn't answer within 90 seconds. It may be busy; try again, or switch to Built-in list."
+      : e.message || "Couldn't reach Gemini. Check your connection.", true);
   } finally {
+    clearInterval(ticker);
     $("estimateBtn").disabled = false;
   }
 }
@@ -1451,7 +1476,7 @@ async function saveAiKey() {
   const key = $("aiKeyInput").value.trim();
   authMsg("aiMsg", "Checking the key…");
   try {
-    ls.set(AI_MODEL, null);
+    ls.set(AI_MODEL, null); ls.set(AI_THINK, null);
     const model = await pickModel(key, true);
     ls.set(AI_KEY, key); ls.set(EST_MODE, null);
     renderAccount(); renderEstMode();
@@ -1461,7 +1486,7 @@ async function saveAiKey() {
   }
 }
 function removeAiKey() {
-  ls.set(AI_KEY, null); ls.set(AI_MODEL, null); ls.set(EST_MODE, null);
+  ls.set(AI_KEY, null); ls.set(AI_MODEL, null); ls.set(EST_MODE, null); ls.set(AI_THINK, null);
   renderAccount(); renderEstMode();
   authMsg("aiMsg", "Key removed from this device.");
 }
