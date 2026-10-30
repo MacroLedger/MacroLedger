@@ -891,14 +891,22 @@ const ls = {
 };
 const GEMINI = "https://generativelanguage.googleapis.com/v1beta";
 const aiKey = () => ls.get(AI_KEY);
-const aiOn = () => !!aiKey() && ls.get(EST_MODE) !== "list";
+const CN_KEY = "macro-ledger-calorieninjas-key";
+const cnKey = () => ls.get(CN_KEY);
+// Which estimator the Estimate button uses: the saved choice if it's still available, else Gemini, then CalorieNinjas, then the list.
+function estMode() {
+  const m = ls.get(EST_MODE);
+  if (m === "list") return "list";
+  if (m === "cn" && cnKey()) return "cn";
+  return aiKey() ? "ai" : cnKey() ? "cn" : "list";
+}
 
 async function geminiError(r) {
   let m = "";
   try { m = (await r.json()).error.message || ""; } catch {}
-  if (r.status === 429) return new Error("You've hit Gemini's free limit for now. Try again in a minute, or use the built-in list.");
+  if (r.status === 429) return Object.assign(new Error("You've hit Gemini's free limit for now. Try again in a minute, or use the built-in list."), { busy: true });
   if (/api key/i.test(m) || r.status === 401 || r.status === 403) return new Error("Gemini didn't accept the key. Check it in Settings → Account.");
-  if ([500, 503, 504].includes(r.status)) return new Error(`Google's Gemini servers are busy right now (${r.status}), and the other models were too. This happens at peak times on the free tier; try again in a few minutes, or use the built-in list.`);
+  if ([500, 503, 504].includes(r.status)) return Object.assign(new Error(`Google's Gemini servers are busy right now (${r.status}), and the other models were too. This happens at peak times on the free tier; try again in a few minutes, or use the built-in list.`), { busy: true });
   return new Error(`Gemini couldn't answer (${r.status}). Try again, or use the built-in list.`);
 }
 // Model names change over time, so ask Google which Flash models this key can use.
@@ -1020,24 +1028,75 @@ async function estimateAI(text) {
     setMsg(`Done in ${Math.round((Date.now() - started) / 1000)}s with ${model}${fellBack ? ` (${ls.get(AI_MODEL)} was busy)` : ""}. AI estimates are approximate; check the amounts, then add.`);
     renderPreview();
   } catch (e) {
+    clearInterval(ticker);
+    // Gemini busy, over its limit or unreachable: let CalorieNinjas answer instead, if it's connected
+    if (cnKey() && (e.busy || e instanceof TypeError)) { await estimateCN(text, "Gemini was busy, so CalorieNinjas estimated this."); return; }
     setMsg(e.message || "Couldn't reach Gemini. Check your connection.", true);
   } finally {
     clearInterval(ticker);
     $("estimateBtn").disabled = false;
   }
 }
+
+/* ---------- CalorieNinjas: free text-to-nutrition with the user's own free key ---------- */
+// It reports total sugar only, which isn't added sugar, so its items count 0 g added sugar.
+async function cnEstimate(text, key = cnKey()) {
+  let r;
+  try {
+    r = await fetch("https://api.calorieninjas.com/v1/nutrition?query=" + encodeURIComponent(text.slice(0, 1500)), { headers: { "X-Api-Key": key }, signal: timeout(20000) });
+  } catch (e) {
+    throw new Error(e.name === "TimeoutError" ? "CalorieNinjas took too long to answer. Try again." : "Couldn't reach CalorieNinjas. Check your connection.");
+  }
+  if ([400, 401, 403].includes(r.status)) throw new Error("CalorieNinjas didn't accept the key. Check it in Settings → Account.");
+  if (r.status === 429) throw new Error("You've reached CalorieNinjas' free limit for now. Try again later, or use the built-in list.");
+  if (!r.ok) throw new Error(`CalorieNinjas couldn't answer (${r.status}). Try again, or use the built-in list.`);
+  const num = v => (typeof v === "number" && isFinite(v) ? v : null);
+  return ((await r.json()).items || []).map(it => {
+    if (num(it.calories) == null) throw new Error("CalorieNinjas didn't return calories for this. Try the built-in list.");
+    const g = num(it.serving_size_g);
+    const per = g > 0 ? 100 / g : 1; // store per 100 g so the amount can be changed in grams
+    const base = {
+      label: g > 0 ? "100 g" : "1 serving", g: g > 0 ? 100 : null,
+      kcal: it.calories * per, protein: (num(it.protein_g) || 0) * per, carbs: (num(it.carbohydrates_total_g) || 0) * per,
+      fat: (num(it.fat_total_g) || 0) * per, fiber: (num(it.fiber_g) || 0) * per, sugar: 0,
+    };
+    return makeItem(cap(String(it.name || "Food")), base, g > 0 ? g / 100 : 1, "CalorieNinjas");
+  });
+}
+async function estimateCN(text, lead = "") {
+  $("estimateBtn").disabled = true;
+  setMsg(lead ? `${lead} Asking CalorieNinjas…` : "Asking CalorieNinjas…");
+  try {
+    const items = await cnEstimate(text);
+    if (!items.length) { setMsg("CalorieNinjas didn't recognise any food in that. Try simpler names, like “pizza” and “chicken”.", true); return; }
+    state.pending = [...(state.pending || []), ...items];
+    $("missed").innerHTML = "";
+    setMsg(`${lead ? lead + " " : ""}Check the amounts, then add.`);
+    renderPreview();
+  } catch (e) {
+    setMsg(e.message, true);
+  } finally {
+    $("estimateBtn").disabled = false;
+  }
+}
+
 function renderEstMode() {
-  const on = aiOn();
-  $("estMode").innerHTML = aiKey()
-    ? `<span class="hint">Estimate with</span><button class="chip" data-est="ai" aria-pressed="${on}">AI (Gemini)</button><button class="chip" data-est="list" aria-pressed="${!on}">Built-in list</button>`
+  const mode = estMode();
+  const opts = [aiKey() && ["ai", "AI (Gemini)"], cnKey() && ["cn", "CalorieNinjas"], ["list", "Built-in list"]].filter(Boolean);
+  $("estMode").innerHTML = opts.length > 1
+    ? `<span class="hint">Estimate with</span>${opts.map(([k, l]) => `<button class="chip" data-est="${k}" aria-pressed="${k === mode}">${l}</button>`).join("")}`
     : "";
-  $("estHint").textContent = on ? "Describe it the way you'd say it, e.g. “a small pizza with a few chicken pieces”." : "Foods you've logged before and the built-in list are recognised. Amounts help.";
+  $("estHint").textContent = mode === "ai" ? "Describe it the way you'd say it, e.g. “a small pizza with a few chicken pieces”."
+    : mode === "cn" ? "Name the foods with amounts, e.g. “1 small pizza and 50 g chicken”."
+    : "Foods you've logged before and the built-in list are recognised. Amounts help.";
 }
 
 async function estimate() {
   const text = $("foodText").value.trim();
   if (!text) { setMsg("Type what you ate first.", true); $("foodText").focus(); return; }
-  if (aiOn()) return estimateAI(text);
+  const mode = estMode();
+  if (mode === "ai") return estimateAI(text);
+  if (mode === "cn") return estimateCN(text);
   const { items, missed } = localEstimate(text);
   $("missed").innerHTML = missed.length
     ? `<span class="hint">Not recognised:</span>${missed.map(m => (aiKey() ? `<button class="chip" data-ai="${esc(m)}">Guess “${esc(m)}” with AI</button>` : "") + `<button class="chip" data-search="${esc(m)}">Search “${esc(m)}”</button>`).join("")}`
@@ -1471,6 +1530,12 @@ function renderAccount() {
       : `<p class="hint" style="margin:0">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> (sign in with Google → <b>Create API key</b>), then paste it here. It's saved on this device only, so add it on each device. The free tier has daily limits, and Google may use what you send to improve its products.</p>
         <form class="searchrow" id="aiForm"><input id="aiKeyInput" type="password" autocomplete="off" required placeholder="Paste your Gemini API key" aria-label="Gemini API key"><button class="primary" type="submit">Save key</button></form>`}
     <div class="msg" id="aiMsg" role="status"></div>
+    <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">CalorieNinjas</h3><span class="hint">Optional and free. Steps in when Gemini is busy, or use it on its own.</span></div>
+    ${cnKey()
+      ? `<div class="row-actions"><span>CalorieNinjas is connected on this device (key ending ${esc(cnKey().slice(-4))}).</span><button class="ghost" id="cnRemove">Remove key</button></div>`
+      : `<p class="hint" style="margin:0">Sign up free at <a href="https://calorieninjas.com/register" target="_blank" rel="noopener">calorieninjas.com</a>, copy your API key from your profile page, then paste it here. It's saved on this device only. CalorieNinjas doesn't report added sugar, so its items show 0 g.</p>
+        <form class="searchrow" id="cnForm"><input id="cnKeyInput" type="password" autocomplete="off" required placeholder="Paste your CalorieNinjas API key" aria-label="CalorieNinjas API key"><button class="primary" type="submit">Save key</button></form>`}
+    <div class="msg" id="cnMsg" role="status"></div>
     <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">Backup</h3><span class="hint">Download your whole log as a file, or load one back in. Loading only adds entries you don't already have.</span></div>
     <div class="row-actions">
       <button class="ghost" id="exportBtn">Download backup</button>
@@ -1525,6 +1590,24 @@ async function saveAiKey() {
   } catch (e) {
     authMsg("aiMsg", e.message || "Couldn't check the key. Check your connection.", true);
   }
+}
+async function saveCnKey() {
+  const key = $("cnKeyInput").value.trim();
+  authMsg("cnMsg", "Checking the key…");
+  try {
+    await cnEstimate("1 apple", key); // one small test request
+    ls.set(CN_KEY, key);
+    renderAccount(); renderEstMode();
+    authMsg("cnMsg", "Connected. CalorieNinjas will step in when Gemini is busy.");
+  } catch (e) {
+    authMsg("cnMsg", e.message || "Couldn't check the key. Check your connection.", true);
+  }
+}
+function removeCnKey() {
+  ls.set(CN_KEY, null);
+  if (ls.get(EST_MODE) === "cn") ls.set(EST_MODE, null);
+  renderAccount(); renderEstMode();
+  authMsg("cnMsg", "Key removed from this device.");
 }
 function removeAiKey() {
   ls.set(AI_KEY, null); ls.set(AI_MODEL, null); ls.set(EST_MODE, null); ls.set(AI_THINK, null); ls.set(AI_MODELS, null);
@@ -1679,8 +1762,9 @@ document.addEventListener("click", e => {
   if (t.id === "signOutBtn") store.sb.auth.signOut();
   if (t.id === "signUpBtn") signUp();
   if (t.id === "aiRemove") removeAiKey();
+  if (t.id === "cnRemove") removeCnKey();
   const est = t.closest("[data-est]");
-  if (est) { ls.set(EST_MODE, est.dataset.est === "list" ? "list" : null); renderEstMode(); }
+  if (est) { ls.set(EST_MODE, est.dataset.est === "ai" ? null : est.dataset.est); renderEstMode(); }
   const ai = t.closest("[data-ai]");
   if (ai) { ai.remove(); estimateAI(ai.dataset.ai); }
   if (t.id === "magicBtn") magicLink();
@@ -1693,6 +1777,7 @@ document.addEventListener("submit", e => {
   if (e.target.id === "signInForm") { e.preventDefault(); signIn(); }
   if (e.target.id === "setPwForm") { e.preventDefault(); setPassword(); }
   if (e.target.id === "aiForm") { e.preventDefault(); saveAiKey(); }
+  if (e.target.id === "cnForm") { e.preventDefault(); saveCnKey(); }
 });
 document.addEventListener("change", e => {
   if (e.target.id === "importFile" && e.target.files[0]) { importBackup(e.target.files[0]); e.target.value = ""; }
