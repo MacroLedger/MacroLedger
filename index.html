@@ -1296,9 +1296,19 @@ function saveGoals() {
 function renderAccount() {
   let top;
   if (!SYNC_READY) top = `<p class="hint" style="margin:0">Sync isn't set up yet, so your log is saved on this device only. Follow SETUP.md to connect a free Supabase project, then you can sign in here on every device.</p>`;
-  else if (store.user) top = `<div class="row-actions"><span>Signed in as <b>${esc(store.user.email)}</b>. Your log syncs to every device where you sign in.</span><button class="ghost" id="signOutBtn">Sign out</button></div>`;
-  else top = `<p class="hint" style="margin:0">Sign in with your email to keep your log in your account and see it on all your devices. We'll email you a sign-in link; there's no password.</p>
-    <form class="searchrow" id="signInForm"><input id="signInEmail" type="email" required autocomplete="email" placeholder="you@example.com" aria-label="Email"><button class="primary" type="submit">Email me a link</button></form>
+  else if (store.user) top = `<div class="row-actions"><span>Signed in as <b>${esc(store.user.email)}</b>. Your log syncs to every device where you sign in.</span><button class="ghost" id="signOutBtn">Sign out</button></div>
+    <form class="searchrow" id="setPwForm"><input id="newPw" type="password" minlength="6" required autocomplete="new-password" placeholder="New password (6+ characters)" aria-label="New password"><button class="ghost" type="submit">Set password</button></form>
+    <div class="msg" id="setPwMsg" role="status"></div>`;
+  else top = `<p class="hint" style="margin:0">Sign in to keep your log in your account and see it on all your devices. First time? Enter your email and a password, then press <b>Create account</b>.</p>
+    <form class="mgrid" id="signInForm">
+      <label class="field">Email<input id="signInEmail" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+      <label class="field">Password<input id="signInPw" type="password" minlength="6" required autocomplete="current-password" placeholder="6+ characters"></label>
+    </form>
+    <div class="row-actions">
+      <button class="primary" type="submit" form="signInForm">Sign in</button>
+      <button class="ghost" type="button" id="signUpBtn">Create account</button>
+      <button class="linkbtn" type="button" id="magicBtn">Email me a sign-in link instead</button>
+    </div>
     <div class="msg" id="signInMsg" role="status"></div>`;
   $("account").innerHTML = `<div class="sect-head"><h2 class="sect-title">Account</h2></div>${top}
     <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">Backup</h3><span class="hint">Download your whole log as a file, or load one back in. Loading only adds entries you don't already have.</span></div>
@@ -1308,13 +1318,41 @@ function renderAccount() {
     </div>`;
   renderNote();
 }
-async function signIn(email) {
-  const msg = $("signInMsg");
-  msg.classList.remove("err");
-  msg.textContent = "Sending…";
+function authMsg(id, text, err) { const m = $(id); m.textContent = text; m.classList.toggle("err", !!err); }
+function authError(error) {
+  const m = String(error.message || "");
+  if (/rate limit/i.test(m)) return "Supabase's free email sender allows only a couple of emails per hour. Sign in with a password instead, or wait an hour.";
+  if (/invalid login/i.test(m)) return "That email and password don't match. If you've only ever signed in with an email link, set a password first (see SETUP.md).";
+  if (/already registered/i.test(m)) return "That email already has an account. Press Sign in instead.";
+  return m || "Something went wrong. Try again.";
+}
+const signInFields = () => ({ email: $("signInEmail").value.trim(), password: $("signInPw").value });
+async function signIn() {
+  const { email, password } = signInFields();
+  authMsg("signInMsg", "Signing in…");
+  const { error } = await store.sb.auth.signInWithPassword({ email, password });
+  if (error) authMsg("signInMsg", authError(error), true);
+}
+async function signUp() {
+  const { email, password } = signInFields();
+  if (!email || password.length < 6) { authMsg("signInMsg", "Enter your email and a password of at least 6 characters.", true); return; }
+  authMsg("signInMsg", "Creating your account…");
+  const { data, error } = await store.sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } });
+  if (error) { authMsg("signInMsg", authError(error), true); return; }
+  if (!data.session) authMsg("signInMsg", "Supabase is still set to confirm new accounts by email. Turn off “Confirm email” in Supabase (see SETUP.md), then press Sign in.", true);
+}
+async function magicLink() {
+  const email = $("signInEmail").value.trim();
+  if (!email) { authMsg("signInMsg", "Enter your email first.", true); $("signInEmail").focus(); return; }
+  authMsg("signInMsg", "Sending…");
   const { error } = await store.sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
-  if (error) { msg.classList.add("err"); msg.textContent = `Couldn't send the link: ${error.message}`; return; }
-  msg.textContent = `Check ${email} for a sign-in link. Open it on this device.`;
+  if (error) authMsg("signInMsg", authError(error), true);
+  else authMsg("signInMsg", `Check ${email} for a sign-in link and open it on this device.`);
+}
+async function setPassword() {
+  const { error } = await store.sb.auth.updateUser({ password: $("newPw").value });
+  if (error) authMsg("setPwMsg", authError(error), true);
+  else { authMsg("setPwMsg", "Password set. Use it to sign in on your other devices."); $("newPw").value = ""; }
 }
 function exportBackup() {
   const data = { app: "macro-ledger", version: 1, exported: new Date().toISOString(), goals: state.goals, days: state.days };
@@ -1391,13 +1429,16 @@ document.addEventListener("click", e => {
   if (res) { addResult(Number(res.dataset.res)); return; }
   if (t.id === "exportBtn") exportBackup();
   if (t.id === "signOutBtn") store.sb.auth.signOut();
+  if (t.id === "signUpBtn") signUp();
+  if (t.id === "magicBtn") magicLink();
 });
 document.addEventListener("toggle", e => {
   const d = e.target, m = d.dataset && d.dataset.mealBox;
   if (m) d.open ? state.openMeals.add(m) : state.openMeals.delete(m);
 }, true);
 document.addEventListener("submit", e => {
-  if (e.target.id === "signInForm") { e.preventDefault(); signIn($("signInEmail").value.trim()); }
+  if (e.target.id === "signInForm") { e.preventDefault(); signIn(); }
+  if (e.target.id === "setPwForm") { e.preventDefault(); setPassword(); }
 });
 document.addEventListener("change", e => {
   if (e.target.id === "importFile" && e.target.files[0]) { importBackup(e.target.files[0]); e.target.value = ""; }
