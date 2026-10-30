@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Macro Ledger</title>
-<meta name="description" content="Log what you eat, see calories, protein, carbs, fat, fiber and added sugar against your daily goals.">
+<meta name="description" content="Log what you eat, see calories, protein, carbs, fat and fiber against your daily goals.">
 <meta name="theme-color" content="#6A3FB5">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Macro Ledger">
@@ -18,7 +18,7 @@
 :root {
   --bg: #F4F2F8; --surface: #FFFFFF; --ink: #1D1926; --muted: #655E72; --line: #E0DBE9; --track: #E8E4F0;
   --accent: #6A3FB5; --accent-ink: #FFFFFF; --accent-soft: #ECE4F8;
-  --kcal: #D3602A; --protein: #2E68D1; --carbs: #B9860F; --fat: #BE4374; --fiber: #378F48; --sugar: #0E8A87;
+  --kcal: #D3602A; --protein: #2E68D1; --carbs: #B9860F; --fat: #BE4374; --fiber: #378F48;
   --warn: #BF3B26; --good: #2F8A4A;
   --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
@@ -33,7 +33,7 @@
   :root {
     --bg: #13111A; --surface: #1C1926; --ink: #ECE8F4; --muted: #9D96AB; --line: #2E2A3A; --track: #28243A;
     --accent: #B59AF0; --accent-ink: #1A1029; --accent-soft: #2B2240;
-    --kcal: #F08A55; --protein: #6E9CF0; --carbs: #E0B444; --fat: #E77FA6; --fiber: #6CC57C; --sugar: #4CC6C2;
+    --kcal: #F08A55; --protein: #6E9CF0; --carbs: #E0B444; --fat: #E77FA6; --fiber: #6CC57C;
     --warn: #F27A63; --good: #6CC57C; color-scheme: dark;
   }
 }
@@ -94,6 +94,7 @@ svg.solid .cut { fill: var(--surface); }
 .bymeal-row:hover { background: var(--accent-soft); }
 
 /* Summary */
+.summary:has(> .bars[hidden]) { grid-template-columns: 1fr; }
 .summary { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; grid-template-columns: 200px 1fr; gap: 24px; align-items: center; }
 .ring { position: relative; width: 180px; height: 180px; margin: 0 auto; }
 .ring svg { width: 100%; height: 100%; }
@@ -169,6 +170,8 @@ textarea { width: 100%; min-height: 76px; resize: vertical; border: 1px solid va
 .linkbtn:hover { text-decoration: underline; }
 .msg { font-size: .88rem; color: var(--muted); }
 .msg.err { color: var(--warn); }
+.tipnote { margin: 0; font-size: .82rem; color: var(--muted); background: var(--accent-soft); border-radius: 10px; padding: 8px 12px; }
+.tipnote b { color: var(--ink); font-weight: 600; }
 .missed { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .preview { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .preview-head { background: var(--accent-soft); padding: 8px 12px; font-size: .85rem; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
@@ -347,13 +350,20 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
     <section class="card" id="goals" aria-label="Daily goals">
       <div class="sect-head">
         <h2 class="sect-title">Daily goals</h2>
-        <span class="hint">Calories, carbs, fat and added sugar are limits. Protein and fiber are targets to reach. The bodyweight goal shows on WeightLedger's Home.</span>
+        <span class="hint">Calories, carbs and fat are limits. Protein and fiber are targets to reach. The bodyweight goal shows on WeightLedger's Home.</span>
       </div>
       <form id="goalsForm" class="mgrid"></form>
       <div class="row-actions">
         <button class="primary" id="saveGoals" type="button">Save goals</button>
         <button class="linkbtn" id="cancelGoals" type="button">Undo changes</button>
       </div>
+    </section>
+    <section class="card" aria-label="Macros to show">
+      <div class="sect-head">
+        <h2 class="sect-title">Show on MacroLedger</h2>
+        <span class="hint">Pick which macros appear on Home, Log and History. Calories always show. Hidden macros are still saved.</span>
+      </div>
+      <div class="meals" id="showPrefs" role="group" aria-label="Macros to show"></div>
     </section>
   </div>
 
@@ -397,6 +407,7 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
         <button class="linkbtn" id="manualBtn" type="button">Enter numbers myself</button>
         <span class="msg" id="estMsg" role="status"></span>
       </div>
+      <p class="tipnote"><b>Tip:</b> eating something with a nutrition label? Use <b>Enter numbers myself</b> and copy the values from the label. It's more accurate than AI or list estimates.</p>
       <div class="missed" id="missed"></div>
       <div id="preview"></div>
 
@@ -513,14 +524,13 @@ const NUTS = [
   { k: "carbs",   label: "Carbs",       short: "C",    unit: "g",    type: "limit" },
   { k: "fat",     label: "Fat",         short: "F",    unit: "g",    type: "limit" },
   { k: "fiber",   label: "Fiber",       short: "Fib",  unit: "g",    type: "target" },
-  { k: "sugar",   label: "Added sugar", short: "Sug",  unit: "g",    type: "limit" },
 ];
-const DEFAULT_GOALS = { kcal: 2000, protein: 120, carbs: 220, fat: 65, fiber: 30, sugar: 25 };
+const DEFAULT_GOALS = { kcal: 2000, protein: 120, carbs: 220, fat: 65, fiber: 30 };
 const MEALS = ["Breakfast", "Lunch", "Snacks", "Dinner"];
 const EXAMPLES = ["2 boiled eggs and 2 slices of brown bread", "1 bowl rajma with 1 cup rice", "Chai and 2 marie biscuits", "1 scoop whey in 300 ml milk"];
 
-// Built-in foods. Per serving: [aliases, portion, grams per serving, kcal, protein, carbs, fat, fiber, added sugar]
-// Typical published values for home-style recipes; added sugar counts only sugar added in cooking or processing.
+// Built-in foods. Per serving: [aliases, portion, grams per serving, kcal, protein, carbs, fat, fiber]
+// Typical published values for home-style recipes. (A trailing added-sugar column from an earlier version is ignored.)
 const FOODS = [
   // Breads and grains
   [["roti","chapati","chapatti","phulka"],"1 medium (40 g)",40,104,3,18,2.5,2.7,0],
@@ -1097,11 +1107,10 @@ function aiPrompt(text) {
 Estimate the nutrition of each food in the description below.
 - Split it into separate food items. Respect any quantities, counts, sizes or weights given; otherwise assume a typical single serving. Words like "small", "some" or "a few pieces" should shrink the portion.
 - For dishes (including Indian and other regional dishes), assume a typical home-style or restaurant recipe as the description suggests, with usual oil/ghee/cheese.
-- "sugar" means ADDED sugar only (table sugar, syrups, honey, sweetened products). Natural sugar in fruit, milk or plain yogurt counts as 0.
-- Values are for the whole portion eaten. kcal as a whole number; protein, carbs, fat, fiber, sugar in grams with at most one decimal.
+- Values are for the whole portion eaten. kcal as a whole number; protein, carbs, fat and fiber in grams with at most one decimal.
 - "portion" is a short human description with an approximate weight or volume, e.g. "1 small pizza (300 g)".
 Reply with only JSON in exactly this shape:
-{"items":[{"name":"Roti","portion":"2 medium (80 g)","kcal":208,"protein":6,"carbs":36,"fat":5,"fiber":5.4,"sugar":0}]}
+{"items":[{"name":"Roti","portion":"2 medium (80 g)","kcal":208,"protein":6,"carbs":36,"fat":5,"fiber":5.4}]}
 If the text contains no food, reply {"items":[]}.
 
 Food description:
@@ -1222,12 +1231,12 @@ async function searchOFF(q) {
   if (!r.ok) throw new Error("off " + r.status);
   const j = await r.json();
   return (j.products || []).filter(p => p.product_name && p.nutriments && p.nutriments["energy-kcal_100g"] != null).map(p => {
-    const n = p.nutriments, added = n["added-sugars_100g"];
+    const n = p.nutriments;
     return {
       source: "Open Food Facts",
       name: p.product_name + (p.brands ? ` (${String(p.brands).split(",")[0].trim()})` : ""),
-      per100: { kcal: n["energy-kcal_100g"], protein: n.proteins_100g, carbs: n.carbohydrates_100g, fat: n.fat_100g, fiber: n.fiber_100g, sugar: added ?? n.sugars_100g ?? 0 },
-      note: added != null ? "" : "Sugar shown is total sugar",
+      per100: { kcal: n["energy-kcal_100g"], protein: n.proteins_100g, carbs: n.carbohydrates_100g, fat: n.fat_100g, fiber: n.fiber_100g },
+      note: "",
       serving: Number(p.serving_quantity) || null,
     };
   });
@@ -1240,12 +1249,11 @@ async function searchUSDA(q) {
   const j = await r.json();
   return (j.foods || []).map(f => {
     const get = (...ids) => { for (const id of ids) { const x = (f.foodNutrients || []).find(n => n.nutrientId === id); if (x && x.value != null) return x.value; } return null; };
-    const added = get(1235);
     return {
       source: "USDA",
       name: cap(String(f.description || "Food").toLowerCase()),
-      per100: { kcal: get(1008, 2047, 2048) ?? 0, protein: get(1003) ?? 0, carbs: get(1005) ?? 0, fat: get(1004) ?? 0, fiber: get(1079) ?? 0, sugar: added ?? 0 },
-      note: added != null ? "" : "Added sugar not listed",
+      per100: { kcal: get(1008, 2047, 2048) ?? 0, protein: get(1003) ?? 0, carbs: get(1005) ?? 0, fat: get(1004) ?? 0, fiber: get(1079) ?? 0 },
+      note: "",
       serving: null,
     };
   }).filter(x => x.per100.kcal > 0);
@@ -1321,7 +1329,10 @@ function statusOf(n, eaten, goal) {
   if (n.type === "target") return diff > 0 ? { cls: "", text: `${fmt(diff, n.unit)}${u} to go` } : { cls: "met", text: "Goal met" };
   return diff >= 0 ? { cls: "", text: `${fmt(diff, n.unit)}${u} left` } : { cls: "over", text: `${fmt(-diff, n.unit)}${u} over` };
 }
-const macroLine = v => `<div class="macros">${NUTS.slice(1).map(n => `<i><span class="dot" style="background:var(--${n.k});width:7px;height:7px"></span>${n.short} ${r1(v[n.k])}</i>`).join("")}</div>`;
+// Which macros MacroLedger shows (Settings → Goals → Show on MacroLedger). Calories always show.
+const shownNuts = () => NUTS.slice(1).filter(n => !(state.goals.hidden || []).includes(n.k));
+const shownKeys = () => new Set(shownNuts().map(n => n.k));
+const macroLine = v => `<div class="macros">${shownNuts().map(n => `<i><span class="dot" style="background:var(--${n.k});width:7px;height:7px"></span>${n.short} ${r1(v[n.k])}</i>`).join("")}</div>`;
 function dayName(date) {
   const today = todayKey();
   return date === today ? "Today" : date === shiftKey(today, -1) ? "Yesterday" : parseKey(date).toLocaleDateString(undefined, { weekday: "long" });
@@ -1395,7 +1406,9 @@ function renderSummary(prefix, date) {
     </div>`;
   $(prefix + "-ring").setAttribute("aria-label", `Calories: ${Math.round(t.kcal)} of ${Math.round(g.kcal)} eaten, ${st.text}`);
 
-  $(prefix + "-bars").innerHTML = NUTS.slice(1).map(n => {
+  const shown = shownNuts();
+  $(prefix + "-bars").hidden = !shown.length;
+  $(prefix + "-bars").innerHTML = shown.map(n => {
     const eaten = t[n.k], goal = g[n.k] || 0, s = statusOf(n, eaten, goal);
     const pct = goal > 0 ? Math.min(eaten / goal, 1) * 100 : 0;
     const color = s.cls === "over" ? "var(--warn)" : `var(--${n.k})`;
@@ -1472,14 +1485,14 @@ function itemRow(e, date) {
 }
 
 function factsPanel(t) {
+  const on = shownKeys(), line = (k, label, cls = "") => on.has(k) ? `<div class="fl ${cls}"><span>${label}</span><span class="num">${r1(t[k])} g</span></div>` : "";
   return `<div class="facts" aria-label="Day total">
     <h4>Day Total</h4>
     <div class="fl big"><span>Calories</span><span class="num">${Math.round(t.kcal)}</span></div>
-    <div class="fl"><span><b>Protein</b></span><span class="num">${r1(t.protein)} g</span></div>
-    <div class="fl"><span><b>Total Carbohydrate</b></span><span class="num">${r1(t.carbs)} g</span></div>
-    <div class="fl ind"><span>Dietary Fiber</span><span class="num">${r1(t.fiber)} g</span></div>
-    <div class="fl ind"><span>Added Sugars</span><span class="num">${r1(t.sugar)} g</span></div>
-    <div class="fl"><span><b>Total Fat</b></span><span class="num">${r1(t.fat)} g</span></div>
+    ${line("protein", "<b>Protein</b>")}
+    ${line("carbs", "<b>Total Carbohydrate</b>")}
+    ${line("fiber", "Dietary Fiber", on.has("carbs") ? "ind" : "")}
+    ${line("fat", "<b>Total Fat</b>")}
   </div>`;
 }
 
@@ -1493,7 +1506,7 @@ function renderPreview() {
   if (!p || !p.length) { $("preview").innerHTML = ""; return; }
   const t = totals(p);
   $("preview").innerHTML = `<div class="preview">
-      <div class="preview-head"><span>Estimate · ${p.length} item${p.length === 1 ? "" : "s"}</span><span class="num">${Math.round(t.kcal)} kcal · P ${r1(t.protein)} · C ${r1(t.carbs)} · F ${r1(t.fat)}</span></div>
+      <div class="preview-head"><span>Estimate · ${p.length} item${p.length === 1 ? "" : "s"}</span><span class="num">${[`${Math.round(t.kcal)} kcal`, ...shownNuts().map(n => `${n.short} ${r1(t[n.k])}`)].join(" · ")}</span></div>
       <ul class="items">${p.map(e => {
         const grams = e.base.label === "100 g";
         return `<li class="item">
@@ -1555,7 +1568,7 @@ function recommend() {
     const v = k => (Number(f.e[k]) || 0) * scale;
     const help = k => g[k] > 0 && rem[k] > 0 ? Math.min(v(k), rem[k]) / g[k] : 0;
     let s = f.w + (f.meals[state.meal] || 0) * 1.2 + help("protein") * 12 + help("fiber") * 8;
-    for (const k of ["carbs", "fat", "sugar"]) {
+    for (const k of ["carbs", "fat"]) {
       const room = Math.max(rem[k], 0);
       if (v(k) > room) s -= 2 + (v(k) - room) / Math.max(g[k], 1) * 10;
     }
@@ -1571,8 +1584,9 @@ function recommend() {
     const topMeal = Object.entries(f.meals).sort((a, b) => b[1] - a[1])[0][0];
     if (topMeal === state.meal) why.push(`Usual ${state.meal.toLowerCase()}`);
     const tips = [];
-    if (help("protein") >= 0.06) tips.push(`+${r1(item.protein)} g protein`);
-    if (help("fiber") >= 0.08) tips.push(`+${r1(item.fiber)} g fiber`);
+    const on = shownKeys();
+    if (on.has("protein") && help("protein") >= 0.06) tips.push(`+${r1(item.protein)} g protein`);
+    if (on.has("fiber") && help("fiber") >= 0.08) tips.push(`+${r1(item.fiber)} g fiber`);
     if (scale < 1) tips.push("Half portion fits");
     out.push({ s, item, why, tips });
   }
@@ -1767,7 +1781,18 @@ function renderWeightChart() {
 }
 
 /* ---------- Goals ---------- */
+function renderShowPrefs() {
+  const on = shownKeys();
+  $("showPrefs").innerHTML = NUTS.slice(1).map(n => `<button class="chip" data-show="${n.k}" aria-pressed="${on.has(n.k)}"><span class="dot" style="background:var(--${n.k});margin-right:6px"></span>${n.label}</button>`).join("");
+}
+function toggleShown(k) {
+  const hidden = new Set(state.goals.hidden || []);
+  hidden.has(k) ? hidden.delete(k) : hidden.add(k);
+  state.goals.hidden = [...hidden];
+  store.saveGoals(); render(); renderShowPrefs();
+}
 function renderGoalsForm() {
+  renderShowPrefs();
   $("goalsForm").innerHTML = NUTS.map(n => `<label class="field">${n.label} (${n.unit})<input id="goal-${n.k}" type="number" min="0" step="${n.k === "kcal" ? 10 : 1}" inputmode="decimal" value="${state.goals[n.k]}"></label>`).join("")
     + `<label class="field">Bodyweight goal (kg)<input id="goal-weight" type="number" min="20" max="400" step="0.1" inputmode="decimal" placeholder="Optional" value="${state.goals.weightGoal ?? ""}"></label>`;
 }
@@ -1927,7 +1952,7 @@ async function importBackup(file) {
   }
   if (data.goals && typeof data.goals === "object") {
     for (const n of NUTS) if (Number(data.goals[n.k]) > 0) state.goals[n.k] = Number(data.goals[n.k]);
-    for (const k of ["weightGoal", "weightStart", "weightSince"]) if (data.goals[k] != null) state.goals[k] = data.goals[k];
+    for (const k of ["weightGoal", "weightStart", "weightSince", "hidden"]) if (data.goals[k] != null) state.goals[k] = data.goals[k];
     store.saveGoals();
   }
   render();
@@ -1981,7 +2006,7 @@ function showOnboarding(step = 1) {
     openOverlay(`
       <span class="step">Step 1 of 2</span>
       <h2 id="dlgTitle">Set your daily goals</h2>
-      <p>Start with these and change them any time in Settings → Goals. Calories, carbs, fat and added sugar are limits; protein and fiber are targets.</p>
+      <p>Start with these and change them any time in Settings → Goals. Calories, carbs and fat are limits; protein and fiber are targets.</p>
       <div class="mgrid">${NUTS.map(n => `<label class="field">${n.label} (${n.unit})<input id="ob-${n.k}" type="number" min="0" step="${n.k === "kcal" ? 10 : 1}" inputmode="decimal" value="${state.goals[n.k]}"></label>`).join("")}
         <label class="field">Bodyweight goal (kg)<input id="ob-weight" type="number" min="20" max="400" step="0.1" inputmode="decimal" placeholder="Optional" value="${state.goals.weightGoal ?? ""}"></label>
       </div>
@@ -2027,7 +2052,7 @@ const TOUR = [
   { where: "Welcome", title: "A quick tour", text: "Here's a 2-minute walk through the app, page by page. Use Next and Back, or Skip tour any time. You can replay it from Settings → Account." },
   { mode: "main", tab: "home", target: "#tabs", where: "MacroLedger", title: "Three pages", text: "Home shows what's left today, Log is where you add food, and History lets you look back at any day." },
   { mode: "main", tab: "home", target: "#home-ring", where: "Home", title: "Calories left today", text: "The ring fills as you eat. The big number is what's left of your daily calorie goal, or how far over you are." },
-  { mode: "main", tab: "home", target: "#home-bars", where: "Home", title: "Your macros", text: "Protein, carbs, fat, fiber and added sugar: eaten vs your goal. Limits say how much is left; protein and fiber say how much to go." },
+  { mode: "main", tab: "home", target: "#home-bars", where: "Home", title: "Your macros", text: "Your macros, eaten vs your goal. Carbs and fat say how much is left; protein and fiber say how much to go. Choose which ones show in Settings → Goals." },
   { mode: "main", tab: "home", target: "#home-total", where: "Home", title: "Today's total", text: "A nutrition-label summary of everything you've eaten today, plus calories for each meal. Tap a meal to jump to the Log." },
   { mode: "main", tab: "log", target: "#foodText", where: "Log", title: "Type what you ate", text: "Write it the way you'd say it, like “2 rotis and a bowl of dal”. Amounts help. Then press Estimate macros." },
   { mode: "main", tab: "log", target: "#meals", where: "Log", title: "Pick the meal", text: "Choose Breakfast, Lunch, Snacks or Dinner before adding. With a Gemini key, you can also switch between AI and the built-in list here." },
@@ -2265,6 +2290,8 @@ document.addEventListener("click", e => {
   if (t.id === "obBack") showOnboarding(1);
   if (t.id === "aiRemove") removeAiKey();
   if (t.id === "tourBtn") { startTour(); return; }
+  const show = t.closest("[data-show]");
+  if (show) { toggleShown(show.dataset.show); return; }
   if (t.id === "setWeightGoal") { switchMode("settings", "goals").then(() => $("goal-weight") && $("goal-weight").focus()); return; }
   const est = t.closest("[data-est]");
   if (est) { ls.set(EST_MODE, est.dataset.est === "list" ? "list" : null); renderEstMode(); }
