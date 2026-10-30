@@ -66,6 +66,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .tab:hover { color: var(--ink); }
 .tab[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
 .brandbox { justify-self: start; display: flex; align-items: center; gap: 10px; }
+.hdr-btns { justify-self: end; display: flex; gap: 8px; }
+#ledgerBtn { color: var(--accent); }
+.modebtn svg.solid, .morph svg.solid { width: 22px; height: 22px; fill: currentColor; stroke: none; }
+svg.solid .cut { fill: var(--surface); }
+.morph svg.solid .cut { fill: var(--bg); }
 .modebtn { justify-self: end; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); display: grid; place-items: center; padding: 0; }
 .modebtn svg, .morph svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* The icon that flies to the middle of the screen when switching between the app and settings */
@@ -228,6 +233,39 @@ details.meal > .items { border-left: 2px solid var(--accent-soft); margin-left: 
 .addbtn:hover { background: var(--accent); color: var(--accent-ink); }
 .banner { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: var(--accent-soft); border-radius: var(--r); padding: 12px 16px; font-size: .9rem; }
 
+/* Weight */
+.wform { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: end; }
+.wstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 2px; min-width: 0; }
+.tile .k { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.tile .v { font-family: var(--f-display); font-weight: 800; font-size: 1.9rem; letter-spacing: -0.02em; line-height: 1.15; }
+.tile .v small { font-family: var(--f-body); font-weight: 500; font-size: .9rem; color: var(--muted); margin-left: 3px; }
+.tile .s { font-size: .8rem; color: var(--muted); }
+.wchart { position: relative; }
+.wchart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.wchart .grid { stroke: var(--line); stroke-width: 1; }
+.wchart .axis { fill: var(--muted); font-family: var(--f-mono); font-size: 11px; }
+.wtip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); border-radius: 8px; padding: 6px 10px; font-size: .8rem; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); z-index: 2; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .8rem; color: var(--muted); }
+.legend i { display: inline-flex; align-items: center; gap: 6px; font-style: normal; }
+.legend .ldot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); opacity: .55; }
+.legend .lline { width: 18px; height: 2px; border-radius: 2px; background: var(--accent); }
+.tablewrap { overflow-x: auto; }
+.wtable { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.wtable th { white-space: nowrap; text-align: left; font-weight: 500; font-size: .78rem; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.wtable td { padding: 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.wtable td.n, .wtable th.n { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.wtable tr:last-child td { border-bottom: 0; }
+.chg { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.hw-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.hw-form { display: flex; gap: 8px; align-items: center; }
+.hw-form input { width: 7.5em; border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; background: var(--bg); color: var(--ink); }
+@media (max-width: 640px) {
+  .wstats { grid-template-columns: 1fr; }
+  .wtable { font-size: .82rem; }
+  .wtable td, .wtable th { padding: 7px 4px; }
+}
+
 footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; display: flex; gap: 14px; align-items: center; font-size: .9rem; box-shadow: 0 6px 24px rgb(0 0 0 / .2); max-width: calc(100% - 32px); z-index: 20; }
 .toast button { background: none; border: 0; color: inherit; font-weight: 700; text-decoration: underline; }
@@ -250,10 +288,13 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
 <div class="wrap">
   <header class="top">
     <div class="brandbox">
-      <h1 class="brand">Macro<span>Ledger</span></h1>
+      <h1 class="brand" id="brandName">Macro<span>Ledger</span></h1>
     </div>
     <nav class="tabs" id="tabs" aria-label="Pages"></nav>
-    <button class="modebtn" id="modeBtn" aria-label="Settings"></button>
+    <div class="hdr-btns">
+      <button class="modebtn" id="ledgerBtn" aria-label="Open WeightLedger"></button>
+      <button class="modebtn" id="modeBtn" aria-label="Settings"></button>
+    </div>
   </header>
 
   <div class="banner" id="syncBanner" hidden>
@@ -369,6 +410,44 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
       <div class="bars" id="hist-bars"></div>
     </section>
     <section class="log" id="hist-list" aria-label="That day's meals"></section>
+  </div>
+
+  <!-- WEIGHTLEDGER HOME: today's weigh-in, weekly averages, trend -->
+  <div class="page" id="page-whome" hidden>
+    <div class="page-head">
+      <div><h2 class="page-title">Today</h2><div class="hint" id="whome-date"></div></div>
+      <button class="primary" data-wgo="wlog">Log weight</button>
+    </div>
+    <div class="banner" id="wSyncNote" hidden>
+      <span>Weights are saved on this device for now. To sync them to your account, run the weight step in SETUP.md (one SQL snippet in Supabase).</span>
+    </div>
+    <section class="card" id="home-weight" aria-label="Morning weigh-in"></section>
+    <section class="wstats" id="wStats" aria-label="Weekly averages"></section>
+    <section class="card" id="wChart" aria-label="Weight trend"></section>
+  </div>
+
+  <!-- WEIGHTLEDGER LOG: enter weights, see every weigh-in -->
+  <div class="page" id="page-wlog" hidden>
+    <div class="page-head">
+      <div><h2 class="page-title">Log</h2><div class="hint">Weigh in each morning, after the bathroom and before eating</div></div>
+    </div>
+    <section class="card" aria-label="Log your weight">
+      <div class="sect-head"><h2 class="sect-title">Weigh-in</h2><span class="hint" id="wTodayNote"></span></div>
+      <form class="wform" id="wForm">
+        <label class="field">Weight (kg)<input id="wKg" type="number" step="0.1" min="20" max="400" inputmode="decimal" required placeholder="e.g. 72.4"></label>
+        <label class="field">Date<input id="wDate" type="date"></label>
+        <button class="primary" type="submit">Save weight</button>
+      </form>
+    </section>
+    <section class="card" id="wHistory" aria-label="All weigh-ins"></section>
+  </div>
+
+  <!-- WEIGHTLEDGER HISTORY: week by week -->
+  <div class="page" id="page-whist" hidden>
+    <div class="page-head">
+      <div><h2 class="page-title">History</h2><div class="hint">Your weekly averages, Monday to Sunday</div></div>
+    </div>
+    <section class="card" id="wWeeks" aria-label="Weekly averages by week"></section>
   </div>
 
   <footer>
@@ -681,6 +760,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const state = {
   goals: { ...DEFAULT_GOALS },
   days: {},             // date -> entries[]
+  weights: {},          // date -> kg (morning weigh-in)
   page: "home",
   histDate: shiftKey(todayKey(), -1), // day open on the History page
   meal: defaultMeal(),
@@ -698,13 +778,14 @@ function defaultMeal() {
 /* ---------- Storage: Supabase when signed in, this browser otherwise ---------- */
 const LS_KEY = "macro-ledger-v1";
 const LS_UNSYNCED = "macro-ledger-unsynced"; // set while entries exist that were saved signed-out
+const LS_W_UNSYNCED = "macro-ledger-weights-unsynced"; // same, for weigh-ins
 const store = {
   mode: "local", sb: null, user: null, queues: {}, inflight: {},
   readLocal() {
     try { const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
   },
   writeLocal() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ goals: state.goals, days: state.days })); } catch {}
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ goals: state.goals, days: state.days, weights: state.weights })); } catch {}
   },
   markUnsynced() { try { localStorage.setItem(LS_UNSYNCED, "1"); } catch {} },
   enqueue(key, fn) {
@@ -729,16 +810,45 @@ const store = {
       ? this.check(this.sb.from("days").upsert({ user_id, date, entries, updated_at: new Date().toISOString() }))
       : this.check(this.sb.from("days").delete().eq("date", date)));
   },
+  saveWeight(date) {
+    this.writeLocal();
+    if (this.mode !== "cloud" || this.weightsMissing) { try { localStorage.setItem(LS_W_UNSYNCED, "1"); } catch {} return; }
+    const kg = state.weights[date], user_id = this.user.id;
+    this.enqueue("w:" + date, () => kg != null
+      ? this.check(this.sb.from("weights").upsert({ user_id, date, kg, updated_at: new Date().toISOString() }))
+      : this.check(this.sb.from("weights").delete().eq("date", date)));
+  },
   async fetchCloud() {
-    const [p, d] = await Promise.all([
+    const [p, d, w] = await Promise.all([
       this.sb.from("profiles").select("goals").maybeSingle(),
       this.sb.from("days").select("date,entries").order("date", { ascending: false }).limit(500),
+      this.sb.from("weights").select("date,kg").order("date", { ascending: false }).limit(2000),
     ]);
     if (p.error) throw p.error;
     if (d.error) throw d.error;
     const days = {};
     for (const row of d.data || []) if (Array.isArray(row.entries)) days[row.date] = row.entries;
-    return { goals: p.data && p.data.goals, days };
+    // The weights table comes from a later setup step; until it exists, weights stay on this device.
+    let weights = null;
+    if (!w.error) { weights = {}; for (const row of w.data || []) weights[row.date] = Number(row.kg); }
+    else if (!/42P01|PGRST20/.test(String(w.error.code)) && !/does not exist|schema cache/i.test(w.error.message || "")) throw w.error;
+    return { goals: p.data && p.data.goals, days, weights };
+  },
+  // Take the account's weights, first uploading any saved on this device while signed out or before the table existed.
+  async applyWeights(cloudWeights) {
+    this.weightsMissing = cloudWeights == null;
+    if (this.weightsMissing) return;
+    let unsynced = false;
+    try { unsynced = localStorage.getItem(LS_W_UNSYNCED) === "1"; } catch {}
+    if (unsynced) {
+      const rows = Object.entries(state.weights).filter(([d]) => !(d in cloudWeights))
+        .map(([date, kg]) => ({ user_id: this.user.id, date, kg, updated_at: new Date().toISOString() }));
+      if (rows.length) await this.check(this.sb.from("weights").upsert(rows));
+      for (const r of rows) cloudWeights[r.date] = r.kg;
+      try { localStorage.removeItem(LS_W_UNSYNCED); } catch {}
+    }
+    for (const k of Object.keys(state.weights)) if (this.inflight["w:" + k]) cloudWeights[k] = state.weights[k];
+    state.weights = cloudWeights;
   },
   async refresh() {
     if (this.mode !== "cloud") return;
@@ -746,6 +856,7 @@ const store = {
       const cloud = await this.fetchCloud();
       for (const k of Object.keys(state.days)) if (this.inflight["day:" + k]) cloud.days[k] = state.days[k];
       state.days = cloud.days;
+      await this.applyWeights(cloud.weights);
       if (cloud.goals && !this.inflight.profile) state.goals = { ...DEFAULT_GOALS, ...cloud.goals };
       this.writeLocal(); render();
     } catch { /* keep showing the saved copy */ }
@@ -755,8 +866,8 @@ const store = {
     if (user && this.user && this.user.id === user.id) return; // token refresh
     if (!user) {
       if (this.user) { // signed out: don't leave the log on a shared device
-        state.days = {}; state.goals = { ...DEFAULT_GOALS };
-        try { localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_UNSYNCED); } catch {}
+        state.days = {}; state.goals = { ...DEFAULT_GOALS }; state.weights = {};
+        try { localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_UNSYNCED); localStorage.removeItem(LS_W_UNSYNCED); } catch {}
       }
       this.user = null; this.mode = "local";
       render(); renderAccount(); return;
@@ -780,6 +891,7 @@ const store = {
         try { localStorage.removeItem(LS_UNSYNCED); } catch {}
       }
       state.days = cloud.days;
+      await this.applyWeights(cloud.weights);
       if (cloud.goals) state.goals = { ...DEFAULT_GOALS, ...cloud.goals };
       this.writeLocal();
     } catch {
@@ -789,7 +901,7 @@ const store = {
   },
   init() {
     const local = this.readLocal();
-    if (local) { Object.assign(state.goals, local.goals || {}); state.days = local.days || {}; }
+    if (local) { Object.assign(state.goals, local.goals || {}); state.days = local.days || {}; state.weights = local.weights || {}; }
     if (SYNC_READY && window.supabase) {
       this.sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
       // Supabase calls inside this callback can deadlock, so hand off to a fresh task.
@@ -891,15 +1003,9 @@ const ls = {
 };
 const GEMINI = "https://generativelanguage.googleapis.com/v1beta";
 const aiKey = () => ls.get(AI_KEY);
-const CN_KEY = "macro-ledger-calorieninjas-key";
-const cnKey = () => ls.get(CN_KEY);
-// Which estimator the Estimate button uses: the saved choice if it's still available, else Gemini, then CalorieNinjas, then the list.
-function estMode() {
-  const m = ls.get(EST_MODE);
-  if (m === "list") return "list";
-  if (m === "cn" && cnKey()) return "cn";
-  return aiKey() ? "ai" : cnKey() ? "cn" : "list";
-}
+ls.set("macro-ledger-calorieninjas-key", null); // CalorieNinjas support was removed; drop any key a previous version saved
+// Which estimator the Estimate button uses: Gemini when it has a key, unless the built-in list was chosen.
+const estMode = () => (aiKey() && ls.get(EST_MODE) !== "list" ? "ai" : "list");
 
 async function geminiError(r) {
   let m = "";
@@ -1028,9 +1134,6 @@ async function estimateAI(text) {
     setMsg(`Done in ${Math.round((Date.now() - started) / 1000)}s with ${model}${fellBack ? ` (${ls.get(AI_MODEL)} was busy)` : ""}. AI estimates are approximate; check the amounts, then add.`);
     renderPreview();
   } catch (e) {
-    clearInterval(ticker);
-    // Gemini busy, over its limit or unreachable: let CalorieNinjas answer instead, if it's connected
-    if (cnKey() && (e.busy || e instanceof TypeError)) { await estimateCN(text, "Gemini was busy, so CalorieNinjas estimated this."); return; }
     setMsg(e.message || "Couldn't reach Gemini. Check your connection.", true);
   } finally {
     clearInterval(ticker);
@@ -1038,56 +1141,12 @@ async function estimateAI(text) {
   }
 }
 
-/* ---------- CalorieNinjas: free text-to-nutrition with the user's own free key ---------- */
-// It reports total sugar only, which isn't added sugar, so its items count 0 g added sugar.
-async function cnEstimate(text, key = cnKey()) {
-  let r;
-  try {
-    r = await fetch("https://api.calorieninjas.com/v1/nutrition?query=" + encodeURIComponent(text.slice(0, 1500)), { headers: { "X-Api-Key": key }, signal: timeout(20000) });
-  } catch (e) {
-    throw new Error(e.name === "TimeoutError" ? "CalorieNinjas took too long to answer. Try again." : "Couldn't reach CalorieNinjas. Check your connection.");
-  }
-  if ([400, 401, 403].includes(r.status)) throw new Error("CalorieNinjas didn't accept the key. Check it in Settings → Account.");
-  if (r.status === 429) throw new Error("You've reached CalorieNinjas' free limit for now. Try again later, or use the built-in list.");
-  if (!r.ok) throw new Error(`CalorieNinjas couldn't answer (${r.status}). Try again, or use the built-in list.`);
-  const num = v => (typeof v === "number" && isFinite(v) ? v : null);
-  return ((await r.json()).items || []).map(it => {
-    if (num(it.calories) == null) throw new Error("CalorieNinjas didn't return calories for this. Try the built-in list.");
-    const g = num(it.serving_size_g);
-    const per = g > 0 ? 100 / g : 1; // store per 100 g so the amount can be changed in grams
-    const base = {
-      label: g > 0 ? "100 g" : "1 serving", g: g > 0 ? 100 : null,
-      kcal: it.calories * per, protein: (num(it.protein_g) || 0) * per, carbs: (num(it.carbohydrates_total_g) || 0) * per,
-      fat: (num(it.fat_total_g) || 0) * per, fiber: (num(it.fiber_g) || 0) * per, sugar: 0,
-    };
-    return makeItem(cap(String(it.name || "Food")), base, g > 0 ? g / 100 : 1, "CalorieNinjas");
-  });
-}
-async function estimateCN(text, lead = "") {
-  $("estimateBtn").disabled = true;
-  setMsg(lead ? `${lead} Asking CalorieNinjas…` : "Asking CalorieNinjas…");
-  try {
-    const items = await cnEstimate(text);
-    if (!items.length) { setMsg("CalorieNinjas didn't recognise any food in that. Try simpler names, like “pizza” and “chicken”.", true); return; }
-    state.pending = [...(state.pending || []), ...items];
-    $("missed").innerHTML = "";
-    setMsg(`${lead ? lead + " " : ""}Check the amounts, then add.`);
-    renderPreview();
-  } catch (e) {
-    setMsg(e.message, true);
-  } finally {
-    $("estimateBtn").disabled = false;
-  }
-}
-
 function renderEstMode() {
   const mode = estMode();
-  const opts = [aiKey() && ["ai", "AI (Gemini)"], cnKey() && ["cn", "CalorieNinjas"], ["list", "Built-in list"]].filter(Boolean);
-  $("estMode").innerHTML = opts.length > 1
-    ? `<span class="hint">Estimate with</span>${opts.map(([k, l]) => `<button class="chip" data-est="${k}" aria-pressed="${k === mode}">${l}</button>`).join("")}`
+  $("estMode").innerHTML = aiKey()
+    ? `<span class="hint">Estimate with</span>${[["ai", "AI (Gemini)"], ["list", "Built-in list"]].map(([k, l]) => `<button class="chip" data-est="${k}" aria-pressed="${k === mode}">${l}</button>`).join("")}`
     : "";
   $("estHint").textContent = mode === "ai" ? "Describe it the way you'd say it, e.g. “a small pizza with a few chicken pieces”."
-    : mode === "cn" ? "Name the foods with amounts, e.g. “1 small pizza and 50 g chicken”."
     : "Foods you've logged before and the built-in list are recognised. Amounts help.";
 }
 
@@ -1096,7 +1155,6 @@ async function estimate() {
   if (!text) { setMsg("Type what you ate first.", true); $("foodText").focus(); return; }
   const mode = estMode();
   if (mode === "ai") return estimateAI(text);
-  if (mode === "cn") return estimateCN(text);
   const { items, missed } = localEstimate(text);
   $("missed").innerHTML = missed.length
     ? `<span class="hint">Not recognised:</span>${missed.map(m => (aiKey() ? `<button class="chip" data-ai="${esc(m)}">Guess “${esc(m)}” with AI</button>` : "") + `<button class="chip" data-search="${esc(m)}">Search “${esc(m)}”</button>`).join("")}`
@@ -1246,6 +1304,10 @@ function render() {
   renderWeek(hd, today);
   renderSummary("hist", hd);
   $("hist-list").innerHTML = mealsHTML(hd, "hist");
+
+  // Weight
+  renderHomeWeight();
+  renderWeight();
 
   renderRecs();
   renderMeals();
@@ -1492,6 +1554,153 @@ function renderRecs() {
     </div>${body}`;
 }
 
+/* ---------- Bodyweight ---------- */
+// Weeks run Monday to Sunday. A week's average is the mean of that week's weigh-ins.
+const kgFmt = n => (Math.round(n * 10) / 10).toFixed(1);
+const mondayOf = k => { const d = parseKey(k); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return dkey(d); };
+const shortDate = k => parseKey(k).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+const minKey = (a, b) => (a < b ? a : b);
+function weekAverages() {
+  const weeks = new Map();
+  for (const [d, kg] of Object.entries(state.weights)) {
+    const m = mondayOf(d);
+    if (!weeks.has(m)) weeks.set(m, []);
+    weeks.get(m).push(Number(kg));
+  }
+  const out = new Map();
+  for (const [m, arr] of weeks) out.set(m, { avg: arr.reduce((a, b) => a + b, 0) / arr.length, n: arr.length });
+  return out;
+}
+function changeText(diff) {
+  if (diff == null) return "–";
+  if (Math.abs(diff) < 0.05) return "No change";
+  return `${diff > 0 ? "▲ +" : "▼ −"}${kgFmt(Math.abs(diff))} kg`;
+}
+function weightSummary() {
+  const today = todayKey(), thisMon = mondayOf(today), lastMon = shiftKey(thisMon, -7);
+  const wk = weekAverages(), cur = wk.get(thisMon), prev = wk.get(lastMon);
+  return { today, thisMon, lastMon, cur, prev, diff: cur && prev ? cur.avg - prev.avg : null, todayKg: state.weights[today] };
+}
+function saveWeightEntry(date, kgText) {
+  const kg = Number(String(kgText).replace(",", "."));
+  if (!Number.isFinite(kg) || kg < 20 || kg > 400) { toast("Enter your weight in kg, e.g. 72.4"); return false; }
+  if (date > todayKey()) { toast("That date is in the future."); return false; }
+  state.weights = { ...state.weights, [date]: Math.round(kg * 10) / 10 };
+  store.saveWeight(date);
+  render();
+  toast(`Saved ${kgFmt(kg)} kg for ${date === todayKey() ? "today" : shortDate(date)}`);
+  return true;
+}
+function deleteWeight(date) {
+  const kg = state.weights[date];
+  if (kg == null) return;
+  const { [date]: _, ...rest } = state.weights;
+  state.weights = rest;
+  store.saveWeight(date);
+  render();
+  toast(`Removed ${kgFmt(kg)} kg on ${shortDate(date)}`, () => { state.weights = { ...state.weights, [date]: kg }; store.saveWeight(date); render(); });
+}
+
+function renderHomeWeight() {
+  const s = weightSummary();
+  $("whome-date").textContent = longDate(s.today);
+  $("home-weight").innerHTML = `<div class="sect-head"><h2 class="sect-title">Morning weigh-in</h2><button class="linkbtn" data-wgo="wlog">All weigh-ins</button></div>
+    <div class="hw-row">
+      ${s.todayKg != null
+        ? `<span>Today: <b class="num">${kgFmt(s.todayKg)} kg</b></span>`
+        : `<form class="hw-form" id="hwForm"><input id="hwKg" type="number" step="0.1" min="20" max="400" inputmode="decimal" required placeholder="kg" aria-label="Today's weight in kg"><button class="primary" type="submit">Save</button></form>`}
+      <span class="hint">This week's average <b class="num" style="color:var(--ink)">${s.cur ? kgFmt(s.cur.avg) + " kg" : "–"}</b> · vs last week <b class="chg" style="color:var(--ink)">${changeText(s.diff)}</b></span>
+    </div>`;
+}
+
+function renderWeight() {
+  const s = weightSummary(), today = s.today, wk = weekAverages();
+  $("wSyncNote").hidden = !(store.mode === "cloud" && store.weightsMissing);
+  $("wDate").max = today;
+  if (!$("wDate").value || $("wDate").value > today) $("wDate").value = today;
+  $("wTodayNote").textContent = s.todayKg != null ? `Today: ${kgFmt(s.todayKg)} kg. Saving again replaces it.` : "Not logged yet today";
+  const count = w => (w ? `${w.n} weigh-in${w.n === 1 ? "" : "s"}` : "No weigh-ins");
+  $("wStats").innerHTML = `
+    <div class="tile"><span class="k">This week's average</span><span class="v">${s.cur ? kgFmt(s.cur.avg) + "<small>kg</small>" : "–"}</span><span class="s">${count(s.cur)} · ${shortDate(s.thisMon)} – ${shortDate(today)}</span></div>
+    <div class="tile"><span class="k">Last week's average</span><span class="v">${s.prev ? kgFmt(s.prev.avg) + "<small>kg</small>" : "–"}</span><span class="s">${count(s.prev)} · ${shortDate(s.lastMon)} – ${shortDate(shiftKey(s.lastMon, 6))}</span></div>
+    <div class="tile"><span class="k">Change vs last week</span><span class="v chg">${changeText(s.diff)}</span><span class="s">${s.diff == null ? "Needs weigh-ins in both weeks" : "This week's average minus last week's"}</span></div>`;
+
+  // Weekly table, newest first
+  const mons = [...wk.keys()].sort().reverse().slice(0, 12);
+  $("wWeeks").innerHTML = `<div class="sect-head"><h2 class="sect-title">Weekly averages</h2><span class="hint">Monday to Sunday · change vs the week before</span></div>` + (mons.length
+    ? `<div class="tablewrap"><table class="wtable"><thead><tr><th>Week</th><th class="n">Average</th><th class="n">Change</th><th class="n">Days</th></tr></thead><tbody>${mons.map(m => {
+        const w = wk.get(m), p = wk.get(shiftKey(m, -7));
+        return `<tr><td>${shortDate(m)} – ${shortDate(minKey(shiftKey(m, 6), today))}</td><td class="n">${kgFmt(w.avg)} kg</td><td class="n">${p ? changeText(w.avg - p.avg) : "–"}</td><td class="n">${w.n}</td></tr>`;
+      }).join("")}</tbody></table></div>`
+    : `<div class="empty">Your weekly averages will appear here once you log your weight.</div>`);
+
+  // Every weigh-in, newest first, with the change from the one before
+  const days = Object.keys(state.weights).sort().reverse();
+  $("wHistory").innerHTML = `<div class="sect-head"><h2 class="sect-title">All weigh-ins</h2><span class="hint">${days.length} logged</span></div>` + (days.length
+    ? `<div class="tablewrap"><table class="wtable"><thead><tr><th>Date</th><th class="n">Weight</th><th class="n">Change</th><th></th></tr></thead><tbody>${days.slice(0, 120).map((d, i) => {
+        const prev = days[i + 1];
+        return `<tr><td>${parseKey(d).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</td><td class="n">${kgFmt(state.weights[d])} kg</td><td class="n">${prev ? changeText(state.weights[d] - state.weights[prev]) : "–"}</td><td style="text-align:right"><button class="del" data-wdel="${d}" aria-label="Remove weight for ${d}">×</button></td></tr>`;
+      }).join("")}</tbody></table></div>`
+    : `<div class="empty">No weigh-ins yet. Step on the scale tomorrow morning and log it above.</div>`);
+
+  renderWeightChart();
+}
+
+// Last 8 weeks: daily weigh-ins as dots, each week's average as a line across that week.
+function renderWeightChart() {
+  const el = $("wChart"), today = todayKey();
+  const start = shiftKey(mondayOf(today), -49), end = shiftKey(mondayOf(today), 6);
+  const pts = Object.entries(state.weights).filter(([d]) => d >= start && d <= today).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([d, kg]) => ({ d, kg: Number(kg) }));
+  const head = `<div class="sect-head"><h2 class="sect-title">Last 8 weeks</h2><div class="legend"><i><span class="ldot"></span>Daily weigh-in</i><i><span class="lline"></span>Weekly average</i></div></div>`;
+  if (pts.length < 2) { el.innerHTML = head + `<div class="empty">Log a few mornings and your trend will show here.</div>`; return; }
+
+  const W = Math.max(300, (el.clientWidth || 680) - 36), H = 230, L = 44, R = 12, T = 14, B = 28;
+  const dayIdx = d => Math.round((parseKey(d) - parseKey(start)) / 864e5);
+  const span = dayIdx(end);
+  const x = d => L + (dayIdx(d) / span) * (W - L - R);
+  const wk = weekAverages(), weeks = [];
+  for (let m = start; m <= today; m = shiftKey(m, 7)) if (wk.has(m)) weeks.push({ m, avg: wk.get(m).avg });
+  const vals = [...pts.map(p => p.kg), ...weeks.map(w => w.avg)];
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const step = hi - lo > 8 ? 2 : hi - lo > 3 ? 1 : 0.5;
+  lo = Math.floor((lo - 0.2) / step) * step; hi = Math.ceil((hi + 0.2) / step) * step;
+  const y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const ticks = [];
+  for (let v = lo; v <= hi + 1e-9; v += step) ticks.push(v);
+  const yTicks = ticks.length > 7 ? ticks.filter((_, i) => i % 2 === 0) : ticks;
+  const mondays = Array.from({ length: 8 }, (_, i) => shiftKey(start, i * 7));
+  const xLabels = W < 480 ? mondays.filter((_, i) => i % 2 === 0) : mondays;
+
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Weight over the last 8 weeks">
+    ${yTicks.map(v => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${step < 1 ? v.toFixed(1) : v}</text>`).join("")}
+    ${xLabels.map(m => `<text class="axis" x="${x(m)}" y="${H - 8}" text-anchor="start">${shortDate(m)}</text>`).join("")}
+    ${weeks.map(w => `<path d="M${x(w.m)} ${y(w.avg)} H${x(minKey(shiftKey(w.m, 6), today))}" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" fill="none"/>`).join("")}
+    ${pts.map(p => `<circle cx="${x(p.d)}" cy="${y(p.kg)}" r="4" fill="var(--accent)" fill-opacity=".55" stroke="var(--surface)" stroke-width="2"/>`).join("")}
+    <line id="wCross" class="grid" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden" stroke-dasharray="3 3"/>
+    <circle id="wHot" r="5.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>
+    <rect id="wHit" x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent"/>
+  </svg>`;
+  el.innerHTML = head + `<div class="wchart">${svg}<div class="wtip" id="wTip" hidden></div></div>`;
+
+  // Hover / touch: nearest weigh-in gets a crosshair and a tooltip
+  const svgEl = el.querySelector("svg"), tip = $("wTip"), cross = $("wCross"), hot = $("wHot");
+  const show = ev => {
+    const r = svgEl.getBoundingClientRect(), k = r.width / W;
+    const mx = (ev.clientX - r.left) / k;
+    let best = pts[0];
+    for (const p of pts) if (Math.abs(x(p.d) - mx) < Math.abs(x(best.d) - mx)) best = p;
+    const px = x(best.d), py = y(best.kg), w = wk.get(mondayOf(best.d));
+    cross.setAttribute("x1", px); cross.setAttribute("x2", px); cross.setAttribute("visibility", "visible");
+    hot.setAttribute("cx", px); hot.setAttribute("cy", py); hot.setAttribute("visibility", "visible");
+    tip.innerHTML = `${parseKey(best.d).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} · <b>${kgFmt(best.kg)} kg</b>${w ? ` · week avg ${kgFmt(w.avg)}` : ""}`;
+    tip.style.left = `${px * k}px`; tip.style.top = `${py * k}px`; tip.hidden = false;
+  };
+  const hide = () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); hot.setAttribute("visibility", "hidden"); };
+  $("wHit").addEventListener("pointermove", show);
+  $("wHit").addEventListener("pointerdown", show);
+  $("wHit").addEventListener("pointerleave", hide);
+}
+
 /* ---------- Goals ---------- */
 function renderGoalsForm() {
   $("goalsForm").innerHTML = NUTS.map(n => `<label class="field">${n.label} (${n.unit})<input id="goal-${n.k}" type="number" min="0" step="${n.k === "kcal" ? 10 : 1}" inputmode="decimal" value="${state.goals[n.k]}"></label>`).join("");
@@ -1530,12 +1739,6 @@ function renderAccount() {
       : `<p class="hint" style="margin:0">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> (sign in with Google → <b>Create API key</b>), then paste it here. It's saved on this device only, so add it on each device. The free tier has daily limits, and Google may use what you send to improve its products.</p>
         <form class="searchrow" id="aiForm"><input id="aiKeyInput" type="password" autocomplete="off" required placeholder="Paste your Gemini API key" aria-label="Gemini API key"><button class="primary" type="submit">Save key</button></form>`}
     <div class="msg" id="aiMsg" role="status"></div>
-    <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">CalorieNinjas</h3><span class="hint">Optional and free. Steps in when Gemini is busy, or use it on its own.</span></div>
-    ${cnKey()
-      ? `<div class="row-actions"><span>CalorieNinjas is connected on this device (key ending ${esc(cnKey().slice(-4))}).</span><button class="ghost" id="cnRemove">Remove key</button></div>`
-      : `<p class="hint" style="margin:0">Sign up free at <a href="https://calorieninjas.com/register" target="_blank" rel="noopener">calorieninjas.com</a>, copy your API key from your profile page, then paste it here. It's saved on this device only. CalorieNinjas doesn't report added sugar, so its items show 0 g.</p>
-        <form class="searchrow" id="cnForm"><input id="cnKeyInput" type="password" autocomplete="off" required placeholder="Paste your CalorieNinjas API key" aria-label="CalorieNinjas API key"><button class="primary" type="submit">Save key</button></form>`}
-    <div class="msg" id="cnMsg" role="status"></div>
     <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">Backup</h3><span class="hint">Download your whole log as a file, or load one back in. Loading only adds entries you don't already have.</span></div>
     <div class="row-actions">
       <button class="ghost" id="exportBtn">Download backup</button>
@@ -1591,24 +1794,6 @@ async function saveAiKey() {
     authMsg("aiMsg", e.message || "Couldn't check the key. Check your connection.", true);
   }
 }
-async function saveCnKey() {
-  const key = $("cnKeyInput").value.trim();
-  authMsg("cnMsg", "Checking the key…");
-  try {
-    await cnEstimate("1 apple", key); // one small test request
-    ls.set(CN_KEY, key);
-    renderAccount(); renderEstMode();
-    authMsg("cnMsg", "Connected. CalorieNinjas will step in when Gemini is busy.");
-  } catch (e) {
-    authMsg("cnMsg", e.message || "Couldn't check the key. Check your connection.", true);
-  }
-}
-function removeCnKey() {
-  ls.set(CN_KEY, null);
-  if (ls.get(EST_MODE) === "cn") ls.set(EST_MODE, null);
-  renderAccount(); renderEstMode();
-  authMsg("cnMsg", "Key removed from this device.");
-}
 function removeAiKey() {
   ls.set(AI_KEY, null); ls.set(AI_MODEL, null); ls.set(EST_MODE, null); ls.set(AI_THINK, null); ls.set(AI_MODELS, null);
   renderAccount(); renderEstMode();
@@ -1620,7 +1805,7 @@ async function setPassword() {
   else { authMsg("setPwMsg", "Password set. Use it to sign in on your other devices."); $("newPw").value = ""; }
 }
 function exportBackup() {
-  const data = { app: "macro-ledger", version: 1, exported: new Date().toISOString(), goals: state.goals, days: state.days };
+  const data = { app: "macro-ledger", version: 1, exported: new Date().toISOString(), goals: state.goals, days: state.days, weights: state.weights };
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
   a.download = `macro-ledger-backup-${todayKey()}.json`;
@@ -1643,6 +1828,13 @@ async function importBackup(file) {
     const extra = list.filter(e => e && e.id && !ids.has(String(e.id))).map(cleanEntry);
     if (extra.length) { state.days[date] = [...cur, ...extra]; added += extra.length; store.saveDay(date); }
   }
+  if (data.weights && typeof data.weights === "object") {
+    for (const [date, kg] of Object.entries(data.weights)) {
+      if (!/^\d{4}-\d\d-\d\d$/.test(date) || date in state.weights || !(Number(kg) > 0)) continue;
+      state.weights = { ...state.weights, [date]: Number(kg) };
+      store.saveWeight(date); added++;
+    }
+  }
   if (data.goals && typeof data.goals === "object") {
     for (const n of NUTS) if (Number(data.goals[n.k]) > 0) state.goals[n.k] = Number(data.goals[n.k]);
     store.saveGoals();
@@ -1663,34 +1855,53 @@ function toast(text, undo) {
 }
 
 /* ---------- Pages ---------- */
-// Two modes share the tab bar: the app (Home / Log / History) and settings (Goals / Account).
+// Three modes share the tab bar: MacroLedger (Home / Log / History), WeightLedger (Home / Log / History)
+// and settings (Goals / Account).
 const PAGES = ["home", "log", "history"];
+const WPAGES = ["whome", "wlog", "whist"];
 const SET_TABS = ["goals", "account"];
-const TAB_LABELS = { home: "Home", log: "Log", history: "History", goals: "Goals", account: "Account" };
+const TABS = { main: PAGES, weight: WPAGES, settings: SET_TABS };
+const TAB_ATTR = { main: "go", weight: "wgo", settings: "set" };
+const TAB_LABELS = { home: "Home", log: "Log", history: "History", whome: "Home", wlog: "Log", whist: "History", goals: "Goals", account: "Account" };
+const LEDGER = {
+  main: { brand: "Macro<span>Ledger</span>", switchIcon: "body", switchLabel: "Open WeightLedger" },
+  weight: { brand: "Weight<span>Ledger</span>", switchIcon: "plate", switchLabel: "Back to MacroLedger" },
+};
 const ICONS = {
   gear: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
   home: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+  // Solid icons in the accent colour for switching between the two ledgers
+  body: `<svg class="solid" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="4.1" r="2.5"/><path d="M8.6 7.9h6.8c1 0 1.8.7 1.9 1.7l.6 5.4a1.05 1.05 0 0 1-2.1.25l-.45-3.6V21a1.25 1.25 0 0 1-2.5 0v-5.4h-.7V21a1.25 1.25 0 0 1-2.5 0v-9.35l-.45 3.6a1.05 1.05 0 0 1-2.1-.25l.6-5.4c.1-1 .9-1.7 1.9-1.7z"/></svg>`,
+  plate: `<svg class="solid" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.4"/><circle cx="12" cy="12" r="4.5" class="cut"/><circle cx="12" cy="12" r="3.5"/><path d="M2.4 3h.85v3.7h.55V3h.85v3.7h.55V3h.85v4.3c0 .65-.4 1.2-.95 1.4V21a.85.85 0 0 1-1.7 0V8.7c-.55-.2-.95-.75-.95-1.4z"/><path d="M21.6 3.3V21a.85.85 0 0 1-1.7 0v-8.6h-1.15V8.1c0-2.4.8-4.4 2.1-5.1.4-.2.75 0 .75.3z"/></svg>`,
 };
-state.mode = "main";
+state.mode = "main";      // "main" (MacroLedger), "weight" (WeightLedger) or "settings"
+state.wpage = "whome";
 state.setTab = "goals";
+state.backMode = "main";  // which ledger the home button returns to from settings
 
-const currentTab = () => state.mode === "main" ? state.page : state.setTab;
+const currentTab = () => (state.mode === "main" ? state.page : state.mode === "weight" ? state.wpage : state.setTab);
 function renderTabs() {
-  const main = state.mode === "main", list = main ? PAGES : SET_TABS, cur = currentTab();
-  $("tabs").setAttribute("aria-label", main ? "Pages" : "Settings");
-  $("tabs").innerHTML = list.map(k => `<button class="tab" data-${main ? "go" : "set"}="${k}"${k === cur ? ' aria-current="page"' : ""}>${TAB_LABELS[k]}</button>`).join("");
-  $("modeBtn").innerHTML = ICONS[main ? "gear" : "home"];
-  $("modeBtn").setAttribute("aria-label", main ? "Settings" : "Back to Home");
+  const mode = state.mode, list = TABS[mode], cur = currentTab();
+  const ledger = LEDGER[mode === "settings" ? state.backMode : mode];
+  $("tabs").setAttribute("aria-label", mode === "settings" ? "Settings" : "Pages");
+  $("tabs").innerHTML = list.map(k => `<button class="tab" data-${TAB_ATTR[mode]}="${k}"${k === cur ? ' aria-current="page"' : ""}>${TAB_LABELS[k]}</button>`).join("");
+  $("brandName").innerHTML = ledger.brand;
+  $("ledgerBtn").hidden = mode === "settings";
+  $("ledgerBtn").innerHTML = ICONS[ledger.switchIcon];
+  $("ledgerBtn").setAttribute("aria-label", ledger.switchLabel);
+  $("modeBtn").innerHTML = ICONS[mode === "settings" ? "home" : "gear"];
+  $("modeBtn").setAttribute("aria-label", mode === "settings" ? "Back to Home" : "Settings");
 }
 function showPages() {
   const cur = currentTab();
-  for (const p of [...PAGES, ...SET_TABS]) $("page-" + p).hidden = p !== cur;
+  for (const p of [...PAGES, ...WPAGES, ...SET_TABS]) $("page-" + p).hidden = p !== cur;
 }
 // Switch tab within the current mode; the new page slides in from the side it sits on.
 function switchTab(next, animate = true) {
-  const order = state.mode === "main" ? PAGES : SET_TABS, prev = currentTab();
-  if (state.mode === "main") state.page = next; else state.setTab = next;
+  const order = TABS[state.mode], prev = currentTab();
+  if (state.mode === "main") state.page = next; else if (state.mode === "weight") state.wpage = next; else state.setTab = next;
   showPages(); renderTabs();
+  if (next === "whome") renderWeightChart(); // the chart sizes itself to the page, which was hidden until now
   const el = $("page-" + next);
   el.classList.remove("slide-from-right", "slide-from-left");
   if (animate && prev !== next) {
@@ -1703,26 +1914,28 @@ function switchTab(next, animate = true) {
 const go = (page, animate = true) => switchTab(page, animate);
 
 function applyMode(to, tab) {
+  if (to === "settings") { state.backMode = state.mode; state.setTab = tab || "goals"; renderGoalsForm(); renderAccount(); }
+  else if (to === "weight") state.wpage = tab || "whome"; // each ledger opens on its Home
+  else state.page = tab || "home";
   state.mode = to;
-  if (to === "settings") { state.setTab = tab || "goals"; renderGoalsForm(); renderAccount(); }
-  else state.page = "home"; // the home button always lands on Home
   showPages(); renderTabs(); renderNote();
+  if (to === "weight") renderWeightChart();
   window.scrollTo(0, 0);
 }
 
-// Gear <-> home: everything fades, the tapped icon flies to the middle and grows, then the other side appears.
+// Gear <-> home and food <-> body: everything fades, the tapped icon flies to the middle and grows, then the other side appears.
 let morphing = false;
-async function switchMode(to, tab) {
+async function switchMode(to, tab, btn = $("modeBtn")) {
   if (morphing) return;
   if (state.mode === to) { if (tab) switchTab(tab); return; }
-  const btn = $("modeBtn"), app = document.querySelector(".wrap"), ghost = $("morph");
+  const app = document.querySelector(".wrap"), ghost = $("morph");
   if (matchMedia("(prefers-reduced-motion: reduce)").matches || !ghost.animate) { applyMode(to, tab); return; }
   morphing = true;
   const r = btn.getBoundingClientRect();
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
   const dx = innerWidth / 2 - cx, dy = innerHeight / 2 - cy;
   const spin = to === "settings" ? 180 : 0;
-  ghost.innerHTML = ICONS[to === "settings" ? "gear" : "home"];
+  ghost.innerHTML = btn.innerHTML; // the icon that was tapped
   Object.assign(ghost.style, { left: `${cx - 20}px`, top: `${cy - 20}px` });
   ghost.hidden = false;
   btn.style.visibility = "hidden";
@@ -1747,11 +1960,16 @@ async function switchMode(to, tab) {
 /* ---------- Events ---------- */
 document.addEventListener("click", e => {
   const t = e.target;
-  if (t.closest("#modeBtn")) { switchMode(state.mode === "main" ? "settings" : "main"); return; }
+  if (t.closest("#modeBtn")) { switchMode(state.mode === "settings" ? state.backMode : "settings"); return; }
+  if (t.closest("#ledgerBtn")) { switchMode(state.mode === "weight" ? "main" : "weight", null, $("ledgerBtn")); return; }
   const goBtn = t.closest("[data-go]");
   if (goBtn) { go(goBtn.dataset.go); return; }
+  const wgoBtn = t.closest("[data-wgo]");
+  if (wgoBtn) { switchTab(wgoBtn.dataset.wgo); return; }
   const setBtn = t.closest("[data-set]");
   if (setBtn) { switchTab(setBtn.dataset.set); return; }
+  const wdel = t.closest("[data-wdel]");
+  if (wdel) { deleteWeight(wdel.dataset.wdel); return; }
   const rm = t.closest("[data-remove]");
   if (rm) { removeEntry(rm.dataset.remove, rm.dataset.date); return; }
   const sr = t.closest("[data-search]");
@@ -1762,9 +1980,8 @@ document.addEventListener("click", e => {
   if (t.id === "signOutBtn") store.sb.auth.signOut();
   if (t.id === "signUpBtn") signUp();
   if (t.id === "aiRemove") removeAiKey();
-  if (t.id === "cnRemove") removeCnKey();
   const est = t.closest("[data-est]");
-  if (est) { ls.set(EST_MODE, est.dataset.est === "ai" ? null : est.dataset.est); renderEstMode(); }
+  if (est) { ls.set(EST_MODE, est.dataset.est === "list" ? "list" : null); renderEstMode(); }
   const ai = t.closest("[data-ai]");
   if (ai) { ai.remove(); estimateAI(ai.dataset.ai); }
   if (t.id === "magicBtn") magicLink();
@@ -1776,8 +1993,9 @@ document.addEventListener("toggle", e => {
 document.addEventListener("submit", e => {
   if (e.target.id === "signInForm") { e.preventDefault(); signIn(); }
   if (e.target.id === "setPwForm") { e.preventDefault(); setPassword(); }
+  if (e.target.id === "wForm") { e.preventDefault(); if (saveWeightEntry($("wDate").value || todayKey(), $("wKg").value)) { $("wKg").value = ""; $("wDate").value = todayKey(); } }
+  if (e.target.id === "hwForm") { e.preventDefault(); saveWeightEntry(todayKey(), $("hwKg").value); }
   if (e.target.id === "aiForm") { e.preventDefault(); saveAiKey(); }
-  if (e.target.id === "cnForm") { e.preventDefault(); saveCnKey(); }
 });
 document.addEventListener("change", e => {
   if (e.target.id === "importFile" && e.target.files[0]) { importBackup(e.target.files[0]); e.target.value = ""; }
@@ -1845,7 +2063,9 @@ $("manualAdd").onclick = () => {
 
 renderTabs();
 renderEstMode();
-{ const h = location.hash.slice(1); if (PAGES.includes(h)) go(h, false); }
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.mode === "weight" && state.wpage === "whome") renderWeightChart(); }, 150); });
+{ const h = location.hash.slice(1); if (PAGES.includes(h)) go(h, false); else if (h === "weight") applyMode("weight"); }
 store.init();
 </script>
 </body>
