@@ -66,7 +66,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .tab:hover { color: var(--ink); }
 .tab[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
 .brandbox { justify-self: start; display: flex; align-items: center; gap: 10px; }
-.modebtn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); display: grid; place-items: center; padding: 0; }
+.modebtn { justify-self: end; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); display: grid; place-items: center; padding: 0; }
 .modebtn svg, .morph svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* The icon that flies to the middle of the screen when switching between the app and settings */
 .morph { position: fixed; z-index: 50; width: 40px; height: 40px; display: grid; place-items: center; color: var(--accent); pointer-events: none; }
@@ -233,8 +233,8 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
 .toast button { background: none; border: 0; color: inherit; font-weight: 700; text-decoration: underline; }
 
 @media (max-width: 640px) {
-  .top { grid-template-columns: 1fr; }
-  .tabs { grid-column: 1; grid-row: 2; justify-self: stretch; }
+  .top { grid-template-columns: 1fr auto; }
+  .tabs { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
   .tab { flex: 1; padding-inline: 8px; }
   .home-split { grid-template-columns: 1fr; }
   .summary { grid-template-columns: 1fr; padding: 16px; }
@@ -250,10 +250,10 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
 <div class="wrap">
   <header class="top">
     <div class="brandbox">
-      <button class="modebtn" id="modeBtn" aria-label="Settings"></button>
       <h1 class="brand">Macro<span>Ledger</span></h1>
     </div>
     <nav class="tabs" id="tabs" aria-label="Pages"></nav>
+    <button class="modebtn" id="modeBtn" aria-label="Settings"></button>
   </header>
 
   <div class="banner" id="syncBanner" hidden>
@@ -306,11 +306,12 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
     <section class="card" aria-label="Log food">
       <div class="sect-head">
         <h2 class="sect-title">What did you eat?</h2>
-        <span class="hint">Foods you've logged before and the built-in list are recognised. Amounts help.</span>
+        <span class="hint" id="estHint">Foods you've logged before and the built-in list are recognised. Amounts help.</span>
       </div>
       <textarea id="foodText" placeholder="e.g. 2 rotis, a bowl of dal, 100 g paneer and a cup of chai"></textarea>
       <div class="examples" id="examples"><span class="hint">Try:</span></div>
       <div class="meals" id="meals" role="group" aria-label="Meal"></div>
+      <div class="meals" id="estMode" role="group" aria-label="Estimate with"></div>
       <div class="row-actions">
         <button class="primary" id="estimateBtn">Estimate macros</button>
         <button class="linkbtn" id="manualBtn" type="button">Enter numbers myself</button>
@@ -882,12 +883,103 @@ function localEstimate(text) {
   return { items, missed };
 }
 
-function estimate() {
+/* ---------- AI estimates: Google Gemini with the user's own free key, kept on this device ---------- */
+const AI_KEY = "macro-ledger-gemini-key", AI_MODEL = "macro-ledger-gemini-model", EST_MODE = "macro-ledger-est-mode";
+const ls = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
+};
+const GEMINI = "https://generativelanguage.googleapis.com/v1beta";
+const aiKey = () => ls.get(AI_KEY);
+const aiOn = () => !!aiKey() && ls.get(EST_MODE) !== "list";
+
+async function geminiError(r) {
+  let m = "";
+  try { m = (await r.json()).error.message || ""; } catch {}
+  if (r.status === 429) return new Error("You've hit Gemini's free limit for now. Try again in a minute, or use the built-in list.");
+  if (/api key/i.test(m) || r.status === 401 || r.status === 403) return new Error("Gemini didn't accept the key. Check it in Settings → Account.");
+  return new Error(`Gemini couldn't answer (${r.status}). Try again, or use the built-in list.`);
+}
+// Model names change over time, so ask Google which Flash model this key can use and remember it.
+async function pickModel(key, fresh = false) {
+  if (!fresh && ls.get(AI_MODEL)) return ls.get(AI_MODEL);
+  const r = await fetch(`${GEMINI}/models?pageSize=200&key=${encodeURIComponent(key)}`, { signal: timeout(15000) });
+  if (!r.ok) throw await geminiError(r);
+  const names = ((await r.json()).models || [])
+    .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map(m => m.name.replace(/^models\//, ""));
+  const ver = n => parseFloat((n.match(/(\d+(?:\.\d+)?)/) || [])[1]) || 0;
+  const stable = names.filter(n => /flash/.test(n) && !/preview|exp|tts|image|audio|live|thinking|embed|lite|8b/.test(n)).sort((a, b) => ver(b) - ver(a));
+  const pick = names.includes("gemini-flash-latest") ? "gemini-flash-latest" : stable[0] || names.find(n => /flash/.test(n));
+  if (!pick) throw new Error("This key can't use any Gemini Flash model.");
+  ls.set(AI_MODEL, pick);
+  return pick;
+}
+function aiPrompt(text) {
+  return `You are a careful nutrition estimator for a personal food log.
+Estimate the nutrition of each food in the description below.
+- Split it into separate food items. Respect any quantities, counts, sizes or weights given; otherwise assume a typical single serving. Words like "small", "some" or "a few pieces" should shrink the portion.
+- For dishes (including Indian and other regional dishes), assume a typical home-style or restaurant recipe as the description suggests, with usual oil/ghee/cheese.
+- "sugar" means ADDED sugar only (table sugar, syrups, honey, sweetened products). Natural sugar in fruit, milk or plain yogurt counts as 0.
+- Values are for the whole portion eaten. kcal as a whole number; protein, carbs, fat, fiber, sugar in grams with at most one decimal.
+- "portion" is a short human description with an approximate weight or volume, e.g. "1 small pizza (300 g)".
+Reply with only JSON in exactly this shape:
+{"items":[{"name":"Roti","portion":"2 medium (80 g)","kcal":208,"protein":6,"carbs":36,"fat":5,"fiber":5.4,"sugar":0}]}
+If the text contains no food, reply {"items":[]}.
+
+Food description:
+${text.slice(0, 2000)}`;
+}
+async function aiEstimate(text) {
+  const key = aiKey();
+  const call = model => fetch(`${GEMINI}/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, signal: timeout(60000),
+    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: aiPrompt(text) }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } }),
+  });
+  let r = await call(await pickModel(key));
+  if (r.status === 404) r = await call(await pickModel(key, true)); // remembered model was retired
+  if (!r.ok) throw await geminiError(r);
+  const j = await r.json();
+  const raw = ((j.candidates || [])[0]?.content?.parts || []).map(p => p.text || "").join("").replace(/^\s*```(?:json)?|```\s*$/g, "");
+  let data;
+  try { data = JSON.parse(raw); } catch { throw new Error("Gemini's answer couldn't be read. Try again."); }
+  return (Array.isArray(data.items) ? data.items : []).map(it => {
+    const base = { label: String(it.portion || "1 serving").slice(0, 80), g: null };
+    for (const n of NUTS) base[n.k] = Math.max(0, n.k === "kcal" ? Math.round(Number(it[n.k]) || 0) : r1(it[n.k]));
+    return makeItem(String(it.name || "Food"), base, 1, "AI estimate");
+  });
+}
+async function estimateAI(text) {
+  $("estimateBtn").disabled = true;
+  setMsg("Asking Gemini…");
+  try {
+    const items = await aiEstimate(text);
+    if (!items.length) { setMsg("Gemini didn't find any food in that. Try describing it differently.", true); return; }
+    state.pending = [...(state.pending || []), ...items];
+    $("missed").innerHTML = "";
+    setMsg("AI estimates are approximate. Check the amounts, then add.");
+    renderPreview();
+  } catch (e) {
+    setMsg(e.name === "TimeoutError" || e.name === "AbortError" ? "Gemini took too long to answer. Try again." : e.message || "Couldn't reach Gemini. Check your connection.", true);
+  } finally {
+    $("estimateBtn").disabled = false;
+  }
+}
+function renderEstMode() {
+  const on = aiOn();
+  $("estMode").innerHTML = aiKey()
+    ? `<span class="hint">Estimate with</span><button class="chip" data-est="ai" aria-pressed="${on}">AI (Gemini)</button><button class="chip" data-est="list" aria-pressed="${!on}">Built-in list</button>`
+    : "";
+  $("estHint").textContent = on ? "Describe it the way you'd say it, e.g. “a small pizza with a few chicken pieces”." : "Foods you've logged before and the built-in list are recognised. Amounts help.";
+}
+
+async function estimate() {
   const text = $("foodText").value.trim();
   if (!text) { setMsg("Type what you ate first.", true); $("foodText").focus(); return; }
+  if (aiOn()) return estimateAI(text);
   const { items, missed } = localEstimate(text);
   $("missed").innerHTML = missed.length
-    ? `<span class="hint">Not recognised:</span>${missed.map(m => `<button class="chip" data-search="${esc(m)}">Search “${esc(m)}”</button>`).join("")}`
+    ? `<span class="hint">Not recognised:</span>${missed.map(m => (aiKey() ? `<button class="chip" data-ai="${esc(m)}">Guess “${esc(m)}” with AI</button>` : "") + `<button class="chip" data-search="${esc(m)}">Search “${esc(m)}”</button>`).join("")}`
     : "";
   if (!items.length) { setMsg("None of that is in your log or the built-in list yet. Search for it below, or enter the numbers yourself.", true); return; }
   state.pending = [...(state.pending || []), ...items];
@@ -1311,6 +1403,12 @@ function renderAccount() {
     </div>
     <div class="msg" id="signInMsg" role="status"></div>`;
   $("account").innerHTML = `<div class="sect-head"><h2 class="sect-title">Sign-in and sync</h2></div>${top}
+    <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">AI estimates</h3><span class="hint">Optional and free. Lets you describe food in your own words.</span></div>
+    ${aiKey()
+      ? `<div class="row-actions"><span>Gemini is connected on this device (key ending ${esc(aiKey().slice(-4))}).</span><button class="ghost" id="aiRemove">Remove key</button></div>`
+      : `<p class="hint" style="margin:0">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> (sign in with Google → <b>Create API key</b>), then paste it here. It's saved on this device only, so add it on each device. The free tier has daily limits, and Google may use what you send to improve its products.</p>
+        <form class="searchrow" id="aiForm"><input id="aiKeyInput" type="password" autocomplete="off" required placeholder="Paste your Gemini API key" aria-label="Gemini API key"><button class="primary" type="submit">Save key</button></form>`}
+    <div class="msg" id="aiMsg" role="status"></div>
     <div class="sect-head" style="margin-top:6px"><h3 class="mini-title">Backup</h3><span class="hint">Download your whole log as a file, or load one back in. Loading only adds entries you don't already have.</span></div>
     <div class="row-actions">
       <button class="ghost" id="exportBtn">Download backup</button>
@@ -1348,6 +1446,24 @@ async function magicLink() {
   const { error } = await store.sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
   if (error) authMsg("signInMsg", authError(error), true);
   else authMsg("signInMsg", `Check ${email} for a sign-in link and open it on this device.`);
+}
+async function saveAiKey() {
+  const key = $("aiKeyInput").value.trim();
+  authMsg("aiMsg", "Checking the key…");
+  try {
+    ls.set(AI_MODEL, null);
+    const model = await pickModel(key, true);
+    ls.set(AI_KEY, key); ls.set(EST_MODE, null);
+    renderAccount(); renderEstMode();
+    authMsg("aiMsg", `Connected. Estimates will use ${model}.`);
+  } catch (e) {
+    authMsg("aiMsg", e.message || "Couldn't check the key. Check your connection.", true);
+  }
+}
+function removeAiKey() {
+  ls.set(AI_KEY, null); ls.set(AI_MODEL, null); ls.set(EST_MODE, null);
+  renderAccount(); renderEstMode();
+  authMsg("aiMsg", "Key removed from this device.");
 }
 async function setPassword() {
   const { error } = await store.sb.auth.updateUser({ password: $("newPw").value });
@@ -1496,6 +1612,11 @@ document.addEventListener("click", e => {
   if (t.id === "exportBtn") exportBackup();
   if (t.id === "signOutBtn") store.sb.auth.signOut();
   if (t.id === "signUpBtn") signUp();
+  if (t.id === "aiRemove") removeAiKey();
+  const est = t.closest("[data-est]");
+  if (est) { ls.set(EST_MODE, est.dataset.est === "list" ? "list" : null); renderEstMode(); }
+  const ai = t.closest("[data-ai]");
+  if (ai) { ai.remove(); estimateAI(ai.dataset.ai); }
   if (t.id === "magicBtn") magicLink();
 });
 document.addEventListener("toggle", e => {
@@ -1505,6 +1626,7 @@ document.addEventListener("toggle", e => {
 document.addEventListener("submit", e => {
   if (e.target.id === "signInForm") { e.preventDefault(); signIn(); }
   if (e.target.id === "setPwForm") { e.preventDefault(); setPassword(); }
+  if (e.target.id === "aiForm") { e.preventDefault(); saveAiKey(); }
 });
 document.addEventListener("change", e => {
   if (e.target.id === "importFile" && e.target.files[0]) { importBackup(e.target.files[0]); e.target.value = ""; }
@@ -1570,6 +1692,7 @@ $("manualAdd").onclick = () => {
 };
 
 renderTabs();
+renderEstMode();
 { const h = location.hash.slice(1); if (PAGES.includes(h)) go(h, false); }
 store.init();
 </script>
