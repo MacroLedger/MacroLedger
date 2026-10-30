@@ -898,32 +898,38 @@ async function geminiError(r) {
   try { m = (await r.json()).error.message || ""; } catch {}
   if (r.status === 429) return new Error("You've hit Gemini's free limit for now. Try again in a minute, or use the built-in list.");
   if (/api key/i.test(m) || r.status === 401 || r.status === 403) return new Error("Gemini didn't accept the key. Check it in Settings → Account.");
+  if ([500, 503, 504].includes(r.status)) return new Error(`Google's Gemini servers are busy right now (${r.status}), and the other models were too. This happens at peak times on the free tier; try again in a few minutes, or use the built-in list.`);
   return new Error(`Gemini couldn't answer (${r.status}). Try again, or use the built-in list.`);
 }
-// Model names change over time, so ask Google which Flash model this key can use and remember it.
-async function pickModel(key, fresh = false) {
-  if (!fresh && ls.get(AI_MODEL) && ls.get(AI_MODELS)) return ls.get(AI_MODEL);
-  const r = await fetch(`${GEMINI}/models?pageSize=200&key=${encodeURIComponent(key)}`, { signal: timeout(15000) });
+// Model names change over time, so ask Google which Flash models this key can use.
+const AI_MODELS = "macro-ledger-gemini-models";
+const readModels = () => { try { return JSON.parse(ls.get(AI_MODELS) || "[]"); } catch { return []; } };
+async function refreshModels(key) {
+  const r = await fetch(`${GEMINI}/models?pageSize=1000&key=${encodeURIComponent(key)}`, { signal: timeout(15000) });
   if (!r.ok) throw await geminiError(r);
   const names = ((await r.json()).models || [])
     .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
-    .map(m => m.name.replace(/^models\//, ""));
+    .map(m => m.name.replace(/^models\//, ""))
+    .filter(n => /flash/.test(n) && !/tts|image|audio|live|embed|native|robotics|computer/.test(n));
+  // "-latest" aliases first, then stable before preview/experimental, newest version first
   const ver = n => parseFloat((n.match(/(\d+(?:\.\d+)?)/) || [])[1]) || 0;
-  const usable = names.filter(n => /flash/.test(n) && !/preview|exp|tts|image|audio|live|thinking|embed|8b/.test(n)).sort((a, b) => ver(b) - ver(a));
-  ls.set(AI_MODELS, JSON.stringify(usable)); // offered in Settings → Account
-  const stable = usable.filter(n => !/lite/.test(n));
-  const pick = names.includes("gemini-flash-latest") ? "gemini-flash-latest" : stable[0] || usable[0] || names.find(n => /flash/.test(n));
+  const rank = n => (/latest/.test(n) ? 0 : /preview|exp/.test(n) ? 2 : 1);
+  const list = [...new Set(names)].sort((a, b) => rank(a) - rank(b) || ver(b) - ver(a));
+  ls.set(AI_MODELS, JSON.stringify(list));
+  return list;
+}
+async function pickModel(key, fresh = false) {
+  if (!fresh && ls.get(AI_MODEL) && readModels().length) return ls.get(AI_MODEL);
+  const list = await refreshModels(key);
+  const pick = (fresh || !list.includes(ls.get(AI_MODEL))) ? (list.find(n => !/lite|preview|exp/.test(n)) || list[0]) : ls.get(AI_MODEL);
   if (!pick) throw new Error("This key can't use any Gemini Flash model.");
   ls.set(AI_MODEL, pick);
   return pick;
 }
-const AI_MODELS = "macro-ledger-gemini-models";
 function modelOptions() {
-  let list = [];
-  try { list = JSON.parse(ls.get(AI_MODELS) || "[]"); } catch {}
-  const cur = ls.get(AI_MODEL);
+  const list = readModels(), cur = ls.get(AI_MODEL);
   if (cur && !list.includes(cur)) list.unshift(cur);
-  return list.map(n => `<option value="${esc(n)}"${n === cur ? " selected" : ""}>${esc(n)}${/lite/.test(n) ? " (fastest)" : ""}</option>`).join("");
+  return list.map(n => `<option value="${esc(n)}"${n === cur ? " selected" : ""}>${esc(n)}${/lite/.test(n) ? " (fastest)" : /preview|exp/.test(n) ? " (preview)" : ""}</option>`).join("");
 }
 function aiPrompt(text) {
   return `You are a careful nutrition estimator for a personal food log.
@@ -946,57 +952,75 @@ ${text.slice(0, 2000)}`;
 const AI_THINK = "macro-ledger-gemini-think";
 const THINK_OPTS = [{ thinkingLevel: "minimal" }, { thinkingLevel: "low" }, { thinkingBudget: 0 }, null];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function aiEstimate(text) {
+const BUSY = [429, 500, 503, 504]; // overloaded or over this model's free quota: another model may still answer
+async function aiEstimate(text, onModel = () => {}) {
   const key = aiKey();
-  const call = (model, think) => fetch(`${GEMINI}/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, signal: timeout(90000),
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: aiPrompt(text) }] }],
-      // No temperature: Gemini 3 models can loop below their default of 1.0. The token cap stops any runaway answer.
-      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2048, ...(think ? { thinkingConfig: think } : {}) },
-    }),
-  });
+  const call = async (model, think) => {
+    try {
+      return await fetch(`${GEMINI}/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, signal: timeout(45000),
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: aiPrompt(text) }] }],
+          // No temperature: Gemini 3 models can loop below their default of 1.0. The token cap stops any runaway answer.
+          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2048, ...(think ? { thinkingConfig: think } : {}) },
+        }),
+      });
+    } catch (e) {
+      if (e.name === "TimeoutError" || e.name === "AbortError") return new Response(null, { status: 504 }); // too slow: treat as busy
+      throw e;
+    }
+  };
+  const first = await pickModel(key);
   const attempt = async model => {
-    let i = Math.min(Number(ls.get(AI_THINK)) || 0, THINK_OPTS.length - 1), r;
+    let i = model === first ? Math.min(Number(ls.get(AI_THINK)) || 0, THINK_OPTS.length - 1) : 0, r;
     for (; i < THINK_OPTS.length; i++) {
       r = await call(model, THINK_OPTS[i]);
-      if (r.status === 503) { await sleep(2000); r = await call(model, THINK_OPTS[i]); } // briefly overloaded
       if (r.status !== 400 || i === THINK_OPTS.length - 1) break; // 400: this model rejects that setting, try the next
     }
-    if (r.ok) ls.set(AI_THINK, String(i));
+    if (r.ok && model === first) ls.set(AI_THINK, String(i));
     return r;
   };
-  let r = await attempt(await pickModel(key));
-  if (r.status === 404) { ls.set(AI_THINK, null); r = await attempt(await pickModel(key, true)); } // remembered model was retired
+  // Your chosen model first; if it's busy, Flash-Lite models (lightest load), then the rest. At most four tries.
+  const list = readModels();
+  const order = [first, ...list.filter(n => /lite/.test(n) && !/preview|exp/.test(n)), ...list.filter(n => !/preview|exp/.test(n)), ...list]
+    .filter((n, i, a) => a.indexOf(n) === i).slice(0, 4);
+  let r, used;
+  for (const model of order) {
+    used = model;
+    onModel(model);
+    r = await attempt(model);
+    if (r.status === 503 && model === first) { await sleep(1500); r = await attempt(model); } // one quick retry of your own model
+    if (r.ok || ![404, ...BUSY].includes(r.status)) break;
+  }
   if (!r.ok) throw await geminiError(r);
   const j = await r.json();
   if ((j.candidates || [])[0]?.finishReason === "MAX_TOKENS") throw new Error("Gemini's answer ran too long and was cut off. Try again, or pick a different model in Settings → Account.");
   const raw = ((j.candidates || [])[0]?.content?.parts || []).map(p => p.text || "").join("").replace(/^\s*```(?:json)?|```\s*$/g, "");
   let data;
   try { data = JSON.parse(raw); } catch { throw new Error("Gemini's answer couldn't be read. Try again."); }
-  return (Array.isArray(data.items) ? data.items : []).map(it => {
+  const items = (Array.isArray(data.items) ? data.items : []).map(it => {
     const base = { label: String(it.portion || "1 serving").slice(0, 80), g: null };
     for (const n of NUTS) base[n.k] = Math.max(0, n.k === "kcal" ? Math.round(Number(it[n.k]) || 0) : r1(it[n.k]));
     return makeItem(String(it.name || "Food"), base, 1, "AI estimate");
   });
+  return { items, model: used, fellBack: used !== first };
 }
 async function estimateAI(text) {
   $("estimateBtn").disabled = true;
   const started = Date.now();
-  const tick = () => setMsg(`Asking Gemini… ${Math.round((Date.now() - started) / 1000)}s`);
+  let asking = "Gemini", tries = 0;
+  const tick = () => setMsg(`${tries > 1 ? "That model was busy. " : ""}Asking ${asking}… ${Math.round((Date.now() - started) / 1000)}s`);
   tick();
   const ticker = setInterval(tick, 1000);
   try {
-    const items = await aiEstimate(text);
+    const { items, model, fellBack } = await aiEstimate(text, m => { asking = m; tries++; tick(); });
     if (!items.length) { setMsg("Gemini didn't find any food in that. Try describing it differently.", true); return; }
     state.pending = [...(state.pending || []), ...items];
     $("missed").innerHTML = "";
-    setMsg(`Done in ${Math.round((Date.now() - started) / 1000)}s with ${ls.get(AI_MODEL)}. AI estimates are approximate; check the amounts, then add.`);
+    setMsg(`Done in ${Math.round((Date.now() - started) / 1000)}s with ${model}${fellBack ? ` (${ls.get(AI_MODEL)} was busy)` : ""}. AI estimates are approximate; check the amounts, then add.`);
     renderPreview();
   } catch (e) {
-    setMsg(e.name === "TimeoutError" || e.name === "AbortError"
-      ? `${ls.get(AI_MODEL) || "Gemini"} didn't answer within 90 seconds. Try a Flash-Lite model in Settings → Account, or switch to Built-in list.`
-      : e.message || "Couldn't reach Gemini. Check your connection.", true);
+    setMsg(e.message || "Couldn't reach Gemini. Check your connection.", true);
   } finally {
     clearInterval(ticker);
     $("estimateBtn").disabled = false;
@@ -1453,6 +1477,10 @@ function renderAccount() {
       <label class="ghost" style="cursor:pointer">Load backup<input type="file" id="importFile" accept="application/json,.json" hidden></label>
     </div>`;
   renderNote();
+  // Fill the model menu with everything this key can use (needs a quick request to Google)
+  if (aiKey() && state.mode === "settings") refreshModels(aiKey())
+    .then(() => { if ($("aiModelSel")) $("aiModelSel").innerHTML = modelOptions(); })
+    .catch(() => {});
 }
 function authMsg(id, text, err) { const m = $(id); m.textContent = text; m.classList.toggle("err", !!err); }
 function authError(error) {
