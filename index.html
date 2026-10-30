@@ -249,6 +249,7 @@ details.meal > .items { border-left: 2px solid var(--accent-soft); margin-left: 
 .legend i { display: inline-flex; align-items: center; gap: 6px; font-style: normal; }
 .legend .ldot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); opacity: .55; }
 .legend .lline { width: 18px; height: 2px; border-radius: 2px; background: var(--accent); }
+.legend .lgoal { width: 18px; border-top: 2px dashed var(--ink); opacity: .55; }
 .tablewrap { overflow-x: auto; }
 .wtable { width: 100%; border-collapse: collapse; font-size: .9rem; }
 .wtable th { white-space: nowrap; text-align: left; font-weight: 500; font-size: .78rem; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
@@ -256,6 +257,13 @@ details.meal > .items { border-left: 2px solid var(--accent-soft); margin-left: 
 .wtable td.n, .wtable th.n { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
 .wtable tr:last-child td { border-bottom: 0; }
 .chg { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.goalgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.gtile { display: grid; gap: 2px; min-width: 0; }
+.gtile .k { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.gtile .v { font-family: var(--f-display); font-weight: 800; font-size: 1.6rem; letter-spacing: -0.02em; line-height: 1.15; }
+.gtile .v small { font-family: var(--f-body); font-weight: 500; font-size: .85rem; color: var(--muted); margin-left: 3px; }
+.gtile .s { font-size: .8rem; color: var(--muted); }
+@media (max-width: 420px) { .goalgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .hw-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
 .hw-form { display: flex; gap: 8px; align-items: center; }
 .hw-form input { width: 7.5em; border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; background: var(--bg); color: var(--ink); }
@@ -307,7 +315,7 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
     <section class="card" id="goals" aria-label="Daily goals">
       <div class="sect-head">
         <h2 class="sect-title">Daily goals</h2>
-        <span class="hint">Calories, carbs, fat and added sugar are limits. Protein and fiber are targets to reach.</span>
+        <span class="hint">Calories, carbs, fat and added sugar are limits. Protein and fiber are targets to reach. The bodyweight goal shows on WeightLedger's Home.</span>
       </div>
       <form id="goalsForm" class="mgrid"></form>
       <div class="row-actions">
@@ -1600,16 +1608,31 @@ function deleteWeight(date) {
   toast(`Removed ${kgFmt(kg)} kg on ${shortDate(date)}`, () => { state.weights = { ...state.weights, [date]: kg }; store.saveWeight(date); render(); });
 }
 
+// WeightLedger Home: where you are against your bodyweight goal (logging lives on the Log tab)
 function renderHomeWeight() {
-  const s = weightSummary();
+  const s = weightSummary(), g = state.goals;
   $("whome-date").textContent = longDate(s.today);
-  $("home-weight").innerHTML = `<div class="sect-head"><h2 class="sect-title">Morning weigh-in</h2><button class="linkbtn" data-wgo="wlog">All weigh-ins</button></div>
-    <div class="hw-row">
-      ${s.todayKg != null
-        ? `<span>Today: <b class="num">${kgFmt(s.todayKg)} kg</b></span>`
-        : `<form class="hw-form" id="hwForm"><input id="hwKg" type="number" step="0.1" min="20" max="400" inputmode="decimal" required placeholder="kg" aria-label="Today's weight in kg"><button class="primary" type="submit">Save</button></form>`}
-      <span class="hint">This week's average <b class="num" style="color:var(--ink)">${s.cur ? kgFmt(s.cur.avg) + " kg" : "–"}</b> · vs last week <b class="chg" style="color:var(--ink)">${changeText(s.diff)}</b></span>
-    </div>`;
+  const lastDate = latestWeightDate(), current = lastDate ? state.weights[lastDate] : null;
+  const head = `<div class="sect-head"><h2 class="sect-title">Current vs goal</h2><span class="hint">${s.todayKg != null ? `Weighed in today` : `Not weighed in today · <button class="linkbtn" data-wgo="wlog">Log weight</button>`}</span></div>`;
+  if (current == null) { $("home-weight").innerHTML = head + `<div class="empty">Log your first weigh-in on the Log tab to see where you stand.</div>`; return; }
+  const currentTile = `<div class="gtile"><span class="k">Current</span><span class="v">${kgFmt(current)}<small>kg</small></span><span class="s">${lastDate === s.today ? "Today" : shortDate(lastDate)}</span></div>`;
+  if (g.weightGoal == null) {
+    $("home-weight").innerHTML = head + `<div class="goalgrid">${currentTile}
+      <div class="gtile"><span class="k">Goal</span><span class="v">–</span><span class="s"><button class="linkbtn" id="setWeightGoal">Set a bodyweight goal</button></span></div></div>`;
+    return;
+  }
+  const goal = g.weightGoal, start = g.weightStart ?? state.weights[Object.keys(state.weights).sort()[0]];
+  const losing = goal < start || (goal === start && current > goal);
+  const left = losing ? current - goal : goal - current;            // > 0 while still on the way
+  const total = Math.abs(start - goal), done = losing ? start - current : current - start;
+  const pct = total > 0 ? Math.max(0, Math.min(1, done / total)) * 100 : left <= 0 ? 100 : 0;
+  const reached = left <= 0.05;
+  $("home-weight").innerHTML = head + `<div class="goalgrid">${currentTile}
+      <div class="gtile"><span class="k">Goal</span><span class="v">${kgFmt(goal)}<small>kg</small></span><span class="s">Set ${shortDate(g.weightSince || s.today)} at ${kgFmt(start)} kg</span></div>
+      <div class="gtile"><span class="k">${reached ? "Goal" : "To go"}</span><span class="v">${reached ? "Reached" : kgFmt(left) + "<small>kg</small>"}</span><span class="s">${reached ? `${kgFmt(Math.abs(current - goal))} kg past it` : losing ? "to lose" : "to gain"}</span></div>
+    </div>
+    <div class="track" role="progressbar" aria-label="Progress to bodyweight goal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><div class="fill ${pct > 0 && pct < 100 ? "tip" : ""}" style="width:${pct}%;--c:var(--accent)"></div></div>
+    <span class="hint">${done > 0.05 ? `${losing ? "Lost" : "Gained"} ${kgFmt(done)} of ${kgFmt(total)} kg since you set the goal (${Math.round(pct)}%)` : `Starting point ${kgFmt(start)} kg · ${kgFmt(total)} kg ${losing ? "to lose" : "to gain"} in total`}</span>`;
 }
 
 function renderWeight() {
@@ -1650,7 +1673,8 @@ function renderWeightChart() {
   const el = $("wChart"), today = todayKey();
   const start = shiftKey(mondayOf(today), -49), end = shiftKey(mondayOf(today), 6);
   const pts = Object.entries(state.weights).filter(([d]) => d >= start && d <= today).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([d, kg]) => ({ d, kg: Number(kg) }));
-  const head = `<div class="sect-head"><h2 class="sect-title">Last 8 weeks</h2><div class="legend"><i><span class="ldot"></span>Daily weigh-in</i><i><span class="lline"></span>Weekly average</i></div></div>`;
+  const goal = state.goals.weightGoal;
+  const head = `<div class="sect-head"><h2 class="sect-title">${goal != null ? "Current vs goal · last 8 weeks" : "Last 8 weeks"}</h2><div class="legend"><i><span class="ldot"></span>Daily weigh-in</i><i><span class="lline"></span>Weekly average</i>${goal != null ? `<i><span class="lgoal"></span>Goal</i>` : ""}</div></div>`;
   if (pts.length < 2) { el.innerHTML = head + `<div class="empty">Log a few mornings and your trend will show here.</div>`; return; }
 
   const W = Math.max(300, (el.clientWidth || 680) - 36), H = 230, L = 44, R = 12, T = 14, B = 28;
@@ -1659,7 +1683,7 @@ function renderWeightChart() {
   const x = d => L + (dayIdx(d) / span) * (W - L - R);
   const wk = weekAverages(), weeks = [];
   for (let m = start; m <= today; m = shiftKey(m, 7)) if (wk.has(m)) weeks.push({ m, avg: wk.get(m).avg });
-  const vals = [...pts.map(p => p.kg), ...weeks.map(w => w.avg)];
+  const vals = [...pts.map(p => p.kg), ...weeks.map(w => w.avg), ...(goal != null ? [goal] : [])];
   let lo = Math.min(...vals), hi = Math.max(...vals);
   const step = hi - lo > 8 ? 2 : hi - lo > 3 ? 1 : 0.5;
   lo = Math.floor((lo - 0.2) / step) * step; hi = Math.ceil((hi + 0.2) / step) * step;
@@ -1673,6 +1697,8 @@ function renderWeightChart() {
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Weight over the last 8 weeks">
     ${yTicks.map(v => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${step < 1 ? v.toFixed(1) : v}</text>`).join("")}
     ${xLabels.map(m => `<text class="axis" x="${x(m)}" y="${H - 8}" text-anchor="start">${shortDate(m)}</text>`).join("")}
+    ${goal != null ? `<line x1="${L}" x2="${W - R}" y1="${y(goal)}" y2="${y(goal)}" stroke="var(--ink)" stroke-opacity=".55" stroke-width="1.5" stroke-dasharray="6 5"/>
+      <text class="axis" x="${W - R}" y="${y(goal) + (y(goal) - T < 18 ? 14 : -6)}" text-anchor="end">Goal ${kgFmt(goal)} kg</text>` : ""}
     ${weeks.map(w => `<path d="M${x(w.m)} ${y(w.avg)} H${x(minKey(shiftKey(w.m, 6), today))}" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" fill="none"/>`).join("")}
     ${pts.map(p => `<circle cx="${x(p.d)}" cy="${y(p.kg)}" r="4" fill="var(--accent)" fill-opacity=".55" stroke="var(--surface)" stroke-width="2"/>`).join("")}
     <line id="wCross" class="grid" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden" stroke-dasharray="3 3"/>
@@ -1702,12 +1728,28 @@ function renderWeightChart() {
 
 /* ---------- Goals ---------- */
 function renderGoalsForm() {
-  $("goalsForm").innerHTML = NUTS.map(n => `<label class="field">${n.label} (${n.unit})<input id="goal-${n.k}" type="number" min="0" step="${n.k === "kcal" ? 10 : 1}" inputmode="decimal" value="${state.goals[n.k]}"></label>`).join("");
+  $("goalsForm").innerHTML = NUTS.map(n => `<label class="field">${n.label} (${n.unit})<input id="goal-${n.k}" type="number" min="0" step="${n.k === "kcal" ? 10 : 1}" inputmode="decimal" value="${state.goals[n.k]}"></label>`).join("")
+    + `<label class="field">Bodyweight goal (kg)<input id="goal-weight" type="number" min="20" max="400" step="0.1" inputmode="decimal" placeholder="Optional" value="${state.goals.weightGoal ?? ""}"></label>`;
 }
+const latestWeightDate = () => Object.keys(state.weights).sort().pop();
 function saveGoals() {
   for (const n of NUTS) {
     const v = Number($("goal-" + n.k).value);
     if (Number.isFinite(v) && v >= 0) state.goals[n.k] = v;
+  }
+  // Bodyweight goal: progress is measured from your latest weight when the goal is set or changed
+  const raw = $("goal-weight").value.trim();
+  if (!raw) { delete state.goals.weightGoal; delete state.goals.weightStart; delete state.goals.weightSince; }
+  else {
+    const w = Number(raw.replace(",", "."));
+    if (!Number.isFinite(w) || w < 20 || w > 400) { toast("Enter a bodyweight goal in kg, e.g. 70"); return; }
+    const goal = Math.round(w * 10) / 10;
+    if (goal !== state.goals.weightGoal) {
+      const last = latestWeightDate();
+      state.goals.weightGoal = goal;
+      state.goals.weightStart = last ? state.weights[last] : null;
+      state.goals.weightSince = todayKey();
+    }
   }
   store.saveGoals(); render(); renderGoalsForm(); toast("Goals saved");
 }
@@ -1836,6 +1878,7 @@ async function importBackup(file) {
   }
   if (data.goals && typeof data.goals === "object") {
     for (const n of NUTS) if (Number(data.goals[n.k]) > 0) state.goals[n.k] = Number(data.goals[n.k]);
+    for (const k of ["weightGoal", "weightStart", "weightSince"]) if (data.goals[k] != null) state.goals[k] = data.goals[k];
     store.saveGoals();
   }
   render();
@@ -1979,6 +2022,7 @@ document.addEventListener("click", e => {
   if (t.id === "signOutBtn") store.sb.auth.signOut();
   if (t.id === "signUpBtn") signUp();
   if (t.id === "aiRemove") removeAiKey();
+  if (t.id === "setWeightGoal") { switchMode("settings", "goals").then(() => $("goal-weight") && $("goal-weight").focus()); return; }
   const est = t.closest("[data-est]");
   if (est) { ls.set(EST_MODE, est.dataset.est === "list" ? "list" : null); renderEstMode(); }
   const ai = t.closest("[data-ai]");
@@ -1993,7 +2037,6 @@ document.addEventListener("submit", e => {
   if (e.target.id === "signInForm") { e.preventDefault(); signIn(); }
   if (e.target.id === "setPwForm") { e.preventDefault(); setPassword(); }
   if (e.target.id === "wForm") { e.preventDefault(); if (saveWeightEntry($("wDate").value || todayKey(), $("wKg").value)) { $("wKg").value = ""; $("wDate").value = todayKey(); } }
-  if (e.target.id === "hwForm") { e.preventDefault(); saveWeightEntry(todayKey(), $("hwKg").value); }
   if (e.target.id === "aiForm") { e.preventDefault(); saveAiKey(); }
 });
 document.addEventListener("change", e => {
