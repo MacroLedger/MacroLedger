@@ -273,6 +273,21 @@ details.meal > .items { border-left: 2px solid var(--accent-soft); margin-left: 
   .wtable td, .wtable th { padding: 7px 4px; }
 }
 
+/* Welcome / setup windows */
+.overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; overflow-y: auto;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.dialog { width: min(500px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 24px; display: grid; gap: 14px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / .25); animation: pop .3s cubic-bezier(.2, .8, .2, 1); }
+@keyframes pop { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+.dialog h2 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 1.6rem; letter-spacing: -0.02em; }
+.dialog h2 span { color: var(--accent); }
+.dialog p { margin: 0; color: var(--muted); }
+.dialog .step { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.dialog ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.dialog a { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .dialog { animation: none; } }
+
 footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; display: flex; gap: 14px; align-items: center; font-size: .9rem; box-shadow: 0 6px 24px rgb(0 0 0 / .2); max-width: calc(100% - 32px); z-index: 20; }
 .toast button { background: none; border: 0; color: inherit; font-weight: 700; text-decoration: underline; }
@@ -464,6 +479,7 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
 </div>
 <div class="toast" id="toast" hidden></div>
 <div class="morph" id="morph" hidden aria-hidden="true"></div>
+<div class="overlay" id="overlay" hidden></div>
 
 <script>
 /* ===== Your settings — fill these in (see SETUP.md) ===== */
@@ -877,12 +893,18 @@ const store = {
         try { localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_UNSYNCED); localStorage.removeItem(LS_W_UNSYNCED); } catch {}
       }
       this.user = null; this.mode = "local";
-      render(); renderAccount(); return;
+      render(); renderAccount();
+      showGate(); // not signed in: ask to sign in or create an account
+      return;
     }
     this.user = user; this.mode = "cloud";
+    if ($("overlay").dataset.kind === "gate") closeOverlay();
     renderAccount(); renderNote();
+    let isNew = false;
     try {
       const cloud = await this.fetchCloud();
+      // No saved goals yet means a brand-new account, unless setup was already done on this device without an account
+      isNew = !cloud.goals && !ls.get(onboardedKey()) && !ls.get("macro-ledger-onboarded-local");
       let unsynced = false;
       try { unsynced = localStorage.getItem(LS_UNSYNCED) === "1"; } catch {}
       if (unsynced) { // bring over anything logged on this device before signing in
@@ -905,6 +927,7 @@ const store = {
       toast("Couldn't reach your account. Showing the copy saved on this device.");
     }
     render();
+    if (isNew) showOnboarding(1);
   },
   init() {
     const local = this.readLocal();
@@ -1737,21 +1760,23 @@ function saveGoals() {
     const v = Number($("goal-" + n.k).value);
     if (Number.isFinite(v) && v >= 0) state.goals[n.k] = v;
   }
-  // Bodyweight goal: progress is measured from your latest weight when the goal is set or changed
-  const raw = $("goal-weight").value.trim();
-  if (!raw) { delete state.goals.weightGoal; delete state.goals.weightStart; delete state.goals.weightSince; }
-  else {
-    const w = Number(raw.replace(",", "."));
-    if (!Number.isFinite(w) || w < 20 || w > 400) { toast("Enter a bodyweight goal in kg, e.g. 70"); return; }
-    const goal = Math.round(w * 10) / 10;
-    if (goal !== state.goals.weightGoal) {
-      const last = latestWeightDate();
-      state.goals.weightGoal = goal;
-      state.goals.weightStart = last ? state.weights[last] : null;
-      state.goals.weightSince = todayKey();
-    }
-  }
+  if (!setWeightGoal($("goal-weight").value)) return;
   store.saveGoals(); render(); renderGoalsForm(); toast("Goals saved");
+}
+// Bodyweight goal: progress is measured from your latest weight when the goal is set or changed. Empty clears it.
+function setWeightGoal(rawText) {
+  const raw = String(rawText || "").trim();
+  if (!raw) { delete state.goals.weightGoal; delete state.goals.weightStart; delete state.goals.weightSince; return true; }
+  const w = Number(raw.replace(",", "."));
+  if (!Number.isFinite(w) || w < 20 || w > 400) { toast("Enter a bodyweight goal in kg, e.g. 70"); return false; }
+  const goal = Math.round(w * 10) / 10;
+  if (goal !== state.goals.weightGoal) {
+    const last = latestWeightDate();
+    state.goals.weightGoal = goal;
+    state.goals.weightStart = last ? state.weights[last] : null;
+    state.goals.weightSince = todayKey();
+  }
+  return true;
 }
 
 /* ---------- Account and backup ---------- */
@@ -1799,40 +1824,45 @@ function authError(error) {
   if (/already registered/i.test(m)) return "That email already has an account. Press Sign in instead.";
   return m || "Something went wrong. Try again.";
 }
-const signInFields = () => ({ email: $("signInEmail").value.trim(), password: $("signInPw").value });
-async function signIn() {
-  const { email, password } = signInFields();
-  authMsg("signInMsg", "Signing in…");
+// The same sign-in fields appear on the Account page (ids "signIn…") and in the welcome window ("gate…").
+const signInFields = p => ({ email: $(p + "Email").value.trim(), password: $(p + "Pw").value });
+async function signIn(p = "signIn") {
+  const { email, password } = signInFields(p);
+  if (!email || !password) { authMsg(p + "Msg", "Enter your email and password.", true); return; }
+  authMsg(p + "Msg", "Signing in…");
   const { error } = await store.sb.auth.signInWithPassword({ email, password });
-  if (error) authMsg("signInMsg", authError(error), true);
+  if (error) authMsg(p + "Msg", authError(error), true);
 }
-async function signUp() {
-  const { email, password } = signInFields();
-  if (!email || password.length < 6) { authMsg("signInMsg", "Enter your email and a password of at least 6 characters.", true); return; }
-  authMsg("signInMsg", "Creating your account…");
+async function signUp(p = "signIn") {
+  const { email, password } = signInFields(p);
+  if (!email || password.length < 6) { authMsg(p + "Msg", "Enter your email and a password of at least 6 characters.", true); return; }
+  authMsg(p + "Msg", "Creating your account…");
   const { data, error } = await store.sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } });
-  if (error) { authMsg("signInMsg", authError(error), true); return; }
-  if (!data.session) authMsg("signInMsg", "Supabase is still set to confirm new accounts by email. Turn off “Confirm email” in Supabase (see SETUP.md), then press Sign in.", true);
+  if (error) { authMsg(p + "Msg", authError(error), true); return; }
+  if (!data.session) authMsg(p + "Msg", "Supabase is still set to confirm new accounts by email. Turn off “Confirm email” in Supabase (see SETUP.md), then press Sign in.", true);
 }
-async function magicLink() {
-  const email = $("signInEmail").value.trim();
-  if (!email) { authMsg("signInMsg", "Enter your email first.", true); $("signInEmail").focus(); return; }
-  authMsg("signInMsg", "Sending…");
+async function magicLink(p = "signIn") {
+  const email = $(p + "Email").value.trim();
+  if (!email) { authMsg(p + "Msg", "Enter your email first.", true); $(p + "Email").focus(); return; }
+  authMsg(p + "Msg", "Sending…");
   const { error } = await store.sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
-  if (error) authMsg("signInMsg", authError(error), true);
-  else authMsg("signInMsg", `Check ${email} for a sign-in link and open it on this device.`);
+  if (error) authMsg(p + "Msg", authError(error), true);
+  else authMsg(p + "Msg", `Check ${email} for a sign-in link and open it on this device.`);
 }
-async function saveAiKey() {
-  const key = $("aiKeyInput").value.trim();
-  authMsg("aiMsg", "Checking the key…");
+async function saveAiKey(inputId = "aiKeyInput", msgId = "aiMsg") {
+  const key = $(inputId).value.trim();
+  if (!key) { authMsg(msgId, "Paste your Gemini API key first.", true); return false; }
+  authMsg(msgId, "Checking the key…");
   try {
     ls.set(AI_MODEL, null); ls.set(AI_THINK, null);
     const model = await pickModel(key, true);
     ls.set(AI_KEY, key); ls.set(EST_MODE, null);
     renderAccount(); renderEstMode();
-    authMsg("aiMsg", `Connected. Estimates will use ${model}.`);
+    authMsg(msgId, `Connected. Estimates will use ${model}.`);
+    return true;
   } catch (e) {
-    authMsg("aiMsg", e.message || "Couldn't check the key. Check your connection.", true);
+    authMsg(msgId, e.message || "Couldn't check the key. Check your connection.", true);
+    return false;
   }
 }
 function removeAiKey() {
@@ -1883,6 +1913,92 @@ async function importBackup(file) {
   }
   render();
   toast(added ? `Loaded ${added} entr${added === 1 ? "y" : "ies"} and your goals.` : "Nothing new in that backup; your goals were updated.");
+}
+
+/* ---------- Welcome window (sign in / create account) and first-time setup ---------- */
+const SKIP_GATE = "macro-ledger-skip-gate"; // "Continue without an account", for this browser session
+const onboardedKey = () => "macro-ledger-onboarded-" + (store.user ? store.user.id : "local");
+function openOverlay(html, focusId, kind) {
+  const o = $("overlay");
+  o.dataset.kind = kind;
+  o.innerHTML = `<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">${html}</div>`;
+  o.hidden = false;
+  document.body.style.overflow = "hidden";
+  if (focusId) setTimeout(() => $(focusId) && $(focusId).focus(), 60);
+}
+function closeOverlay() {
+  const o = $("overlay");
+  o.hidden = true; o.innerHTML = ""; o.dataset.kind = "";
+  document.body.style.overflow = "";
+}
+function showGate() {
+  try { if (sessionStorage.getItem(SKIP_GATE)) return; } catch {}
+  openOverlay(`
+    <h2 id="dlgTitle">Welcome to Macro<span>Ledger</span></h2>
+    <p>Track what you eat and your morning weight, and see it on every device. Sign in, or create a free account to get started.</p>
+    <form class="mgrid" id="gateForm">
+      <label class="field" style="grid-column:1/-1">Email<input id="gateEmail" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+      <label class="field" style="grid-column:1/-1">Password<input id="gatePw" type="password" minlength="6" required autocomplete="current-password" placeholder="6+ characters"></label>
+    </form>
+    <div class="row-actions">
+      <button class="primary" type="submit" form="gateForm">Sign in</button>
+      <button class="ghost" type="button" id="gateSignUp">Create account</button>
+    </div>
+    <div class="msg" id="gateMsg" role="status"></div>
+    <div class="row-actions" style="justify-content:space-between">
+      <button class="linkbtn" type="button" id="gateMagic">Email me a sign-in link instead</button>
+      <button class="linkbtn" type="button" id="gateSkip">Continue without an account</button>
+    </div>`, "gateEmail", "gate");
+}
+function skipGate() {
+  try { sessionStorage.setItem(SKIP_GATE, "1"); } catch {}
+  closeOverlay();
+  if (!ls.get(onboardedKey())) showOnboarding(1); // first time on this device without an account: same setup
+}
+// New accounts: step 1 sets goals, step 2 walks through getting a free Gemini key
+function showOnboarding(step = 1) {
+  if (step === 1) {
+    openOverlay(`
+      <span class="step">Step 1 of 2</span>
+      <h2 id="dlgTitle">Set your daily goals</h2>
+      <p>Start with these and change them any time in Settings → Goals. Calories, carbs, fat and added sugar are limits; protein and fiber are targets.</p>
+      <div class="mgrid">${NUTS.map(n => `<label class="field">${n.label} (${n.unit})<input id="ob-${n.k}" type="number" min="0" step="${n.k === "kcal" ? 10 : 1}" inputmode="decimal" value="${state.goals[n.k]}"></label>`).join("")}
+        <label class="field">Bodyweight goal (kg)<input id="ob-weight" type="number" min="20" max="400" step="0.1" inputmode="decimal" placeholder="Optional" value="${state.goals.weightGoal ?? ""}"></label>
+      </div>
+      <div class="row-actions"><button class="primary" id="obNext">Save and continue</button></div>`, "ob-kcal", "onboarding");
+    return;
+  }
+  openOverlay(`
+    <span class="step">Step 2 of 2 · optional</span>
+    <h2 id="dlgTitle">Describe meals in your own words</h2>
+    <p>With a free Google Gemini key you can type things like “a small pizza with a few chicken pieces” and get an estimate. Without one, the app uses its built-in food list and food search.</p>
+    ${aiKey() ? `<p><b style="color:var(--ink)">Gemini is already connected on this device.</b></p>` : `
+    <ol>
+      <li>Open <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> and sign in with your Google account.</li>
+      <li>Click <b>Create API key</b>. If it asks, let it create a new project.</li>
+      <li>Copy the key and paste it here.</li>
+    </ol>
+    <form class="searchrow" id="obAiForm"><input id="obAiKey" type="password" autocomplete="off" placeholder="Paste your Gemini API key" aria-label="Gemini API key"><button class="primary" type="submit">Save key</button></form>
+    <div class="msg" id="obAiMsg" role="status"></div>
+    <p class="hint">Free with daily limits, no card needed. The key stays on this device, so add it on your other devices in Settings → Account. On the free tier Google may use what you send to improve its products; the app only sends the food you type.</p>`}
+    <div class="row-actions" style="justify-content:space-between">
+      <button class="linkbtn" id="obBack">Back</button>
+      <button class="${aiKey() ? "primary" : "ghost"}" id="obSkipAi">${aiKey() ? "Finish" : "Skip for now"}</button>
+    </div>`, aiKey() ? "obSkipAi" : "obAiKey", "onboarding");
+}
+function onboardingGoals() {
+  for (const n of NUTS) {
+    const v = Number($("ob-" + n.k).value);
+    if (Number.isFinite(v) && v >= 0) state.goals[n.k] = v;
+  }
+  if (!setWeightGoal($("ob-weight").value)) return;
+  store.saveGoals(); render();
+  showOnboarding(2);
+}
+function finishOnboarding() {
+  ls.set(onboardedKey(), "1");
+  closeOverlay();
+  toast("You're all set. Log your first meal on the Log tab.");
 }
 
 /* ---------- Toast ---------- */
@@ -2020,21 +2136,29 @@ document.addEventListener("click", e => {
   if (res) { addResult(Number(res.dataset.res)); return; }
   if (t.id === "exportBtn") exportBackup();
   if (t.id === "signOutBtn") store.sb.auth.signOut();
-  if (t.id === "signUpBtn") signUp();
+  if (t.id === "signUpBtn") signUp("signIn");
+  if (t.id === "gateSignUp") signUp("gate");
+  if (t.id === "gateMagic") magicLink("gate");
+  if (t.id === "gateSkip") skipGate();
+  if (t.id === "obNext") onboardingGoals();
+  if (t.id === "obSkipAi") finishOnboarding();
+  if (t.id === "obBack") showOnboarding(1);
   if (t.id === "aiRemove") removeAiKey();
   if (t.id === "setWeightGoal") { switchMode("settings", "goals").then(() => $("goal-weight") && $("goal-weight").focus()); return; }
   const est = t.closest("[data-est]");
   if (est) { ls.set(EST_MODE, est.dataset.est === "list" ? "list" : null); renderEstMode(); }
   const ai = t.closest("[data-ai]");
   if (ai) { ai.remove(); estimateAI(ai.dataset.ai); }
-  if (t.id === "magicBtn") magicLink();
+  if (t.id === "magicBtn") magicLink("signIn");
 });
 document.addEventListener("toggle", e => {
   const d = e.target, m = d.dataset && d.dataset.mealBox;
   if (m) d.open ? state.openMeals.add(m) : state.openMeals.delete(m);
 }, true);
 document.addEventListener("submit", e => {
-  if (e.target.id === "signInForm") { e.preventDefault(); signIn(); }
+  if (e.target.id === "signInForm") { e.preventDefault(); signIn("signIn"); }
+  if (e.target.id === "gateForm") { e.preventDefault(); signIn("gate"); }
+  if (e.target.id === "obAiForm") { e.preventDefault(); saveAiKey("obAiKey", "obAiMsg").then(ok => { if (ok) setTimeout(finishOnboarding, 900); }); }
   if (e.target.id === "setPwForm") { e.preventDefault(); setPassword(); }
   if (e.target.id === "wForm") { e.preventDefault(); if (saveWeightEntry($("wDate").value || todayKey(), $("wKg").value)) { $("wKg").value = ""; $("wDate").value = todayKey(); } }
   if (e.target.id === "aiForm") { e.preventDefault(); saveAiKey(); }
