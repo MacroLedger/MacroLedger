@@ -704,10 +704,10 @@ const FOODS = [
   // rice 100 g cooked (rice dishes 100 g of rice plus what's cooked into it), roti medium. Fried breads are napkin-blotted
   // (about 20% less absorbed oil) and floating oil is skimmed off dals and gravies (about 3–5 g of oil left per katori).
   // These come first, so when a name also appears further down (puri, dal, chole…), the mess version wins.
-  [["chhole bhature","chole bhature","chhole-bhature","chole-bhature","amritsari chhole-bhature","amritsari chhole bhature"],"1 serving chhole + 2 bhature",330,802,20.3,111.5,30.5,10.5,0],
+  // Plates like pav bhaji are logged as their parts (see COMBOS), so each part's count can be set.
   [["puri","poori","ajwain puri","mess puri"],"1 (30 g)",30,109,2.4,14,4.8,2,0],
   [["bhatura","bhature","amritsari bhatura","amritsari bhature"],"1 (90 g)",90,296,6,42,11.6,1.5,0],
-  [["amritsari chhole","amritsari chole","chhole","chole","chana masala"],"1 serving (150 ml)",150,209,8.3,27.5,7.3,7.5,0],
+  [["chhole","chole","amritsari chhole","amritsari chole","chana masala"],"1 serving (150 ml)",150,209,8.3,27.5,7.3,7.5,0],
   [["kaddu chola","kaddu chana"],"1 serving (150 ml)",150,141,5,18.5,5.2,4.5,0],
   [["kaddu","kaddu sabzi","pumpkin sabzi","sitaphal"],"1 serving (150 ml)",150,90,1.5,12,4,2,0],
   [["mix dal","mixed dal"],"1 serving (150 ml)",150,132,7.2,18,3.5,3.5,0],
@@ -719,8 +719,8 @@ const FOODS = [
   [["kadhi","kadhi pakora","kadhi pakoda"],"1 serving (150 ml)",150,151,6,13,8.3,1.5,0],
   [["sambhar","sambar"],"1 serving (150 ml)",150,76,3,11,2.2,3,0],
   [["kadhai paneer","kadai paneer"],"1 serving (150 ml)",150,231,11.5,8,17,2,0],
-  [["egg curry","anda curry"],"2 eggs with gravy (200 g)",200,208,13.6,7,14,1.5,0],
-  [["veg kofta","kofta curry","lauki kofta"],"2 kofta with gravy (200 g)",200,201,5,16,13,3,0],
+  [["egg curry","anda curry"],"1 egg with gravy (100 g)",100,104,6.8,3.5,7,0.8,0],
+  [["veg kofta","kofta curry","lauki kofta"],"1 kofta with gravy (100 g)",100,101,2.5,8,6.5,1.5,0],
   [["chicken butter masala"],"1 serving (150 ml, about 4 pieces)",150,230,19,7,14,1,0],
   [["soya chunks dry","dry soya chunks","soya chunks sabzi","soya chunk sabzi","soya sabzi"],"1 serving (150 ml, 100 g)",100,136,13.3,10.8,4.4,3.3,0],
   [["aloo bhujia","aloo ki bhujia"],"1 serving (150 ml, 100 g)",100,109,1.7,14.2,5.1,1.7,0],
@@ -733,8 +733,8 @@ const FOODS = [
   [["fried rice","veg fried rice"],"1 serving (133 g)",133,175,3.3,30.7,4.3,1.3,0],
   [["lemon rice"],"1 serving (133 g)",133,201,3.3,32,6.7,1.3,0],
   [["tehri","tahri","tehari"],"1 serving (143 g)",143,194,3.8,32.8,5.3,1.4,0],
-  [["paav bhaji","pav bhaji"],"2 pav + 1 serving bhaji",235,401,11,60,13,6,0],
-  [["poha jalebi","poha-jalebi"],"1 plate poha + 2 jalebi",250,446,6,75,13.5,3,0],
+  [["bhaji","pav ki bhaji"],"1 serving (150 ml)",150,159,4,20,7,5,0],
+  [["butter pav","buttered pav","butter paav"],"1 (42 g)",42,120,3.5,20,2.9,0.8,0],
   [["stuffed dosa"],"1 (200 g)",200,324,6,48,12,4,0],
   [["stuffed paratha","gobi aloo paratha","aloo gobi paratha","gobi paratha","gobhi paratha"],"1 (120 g)",120,282,7.5,45,8,7,0],
   [["dahi"],"1 katori (100 g)",100,62,3.5,4.7,3.3,0,0],
@@ -802,7 +802,7 @@ const FOODS = [
   [["kachori"],"1 (60 g)",60,280,5,26,18,2,0],
   [["pakora","pakoda","bhajji","bhajiya"],"100 g",100,290,7,28,17,4,0],
   [["bhel puri","bhel"],"1 plate (150 g)",150,250,6,40,8,4,3],
-  [["pani puri","golgappa","gol gappa","puchka"],"6 pieces",100,220,4,34,8,3,2],
+  [["pani puri","golgappa","gol gappa","puchka"],"1 piece (17 g)",17,37,0.7,5.7,1.3,0.5,0],
   [["sev puri"],"6 pieces",120,300,6,36,15,3,4],
   [["dhokla"],"2 pieces (80 g)",80,130,5,20,3,1.5,3],
   [["aloo tikki"],"1 (70 g)",70,150,2.5,20,7,2,0],
@@ -854,7 +854,7 @@ const FOODS = [
   [["kathal","kathal sabzi","jackfruit sabzi"],"1 katori (150 g)",150,182,2.3,27,7.2,2.5,0],
   [["mushroom matar","matar mushroom","mushroom masala"],"1 katori (150 g)",150,118,3.8,9.6,7.2,2.8,0],
   [["lobia","lobiya","rongi","black eyed peas"],"1 katori (150 g)",150,166,8,21,5.5,3.8,0],
-  [["malai kofta"],"2 kofta with gravy (200 g)",200,346,8,20,26,2.5,0],
+  [["malai kofta"],"1 kofta with gravy (100 g)",100,173,4,10,13,1.3,0],
   [["aloo sabzi","potato curry","aloo curry","dum aloo"],"1 bowl (150 g)",150,170,3,22,8,3,0],
   [["baingan bharta","baingan"],"1 bowl (150 g)",150,130,3,12,8,5,0],
   [["sabzi","mixed veg","vegetable curry","veg curry"],"1 bowl (150 g)",150,150,4,15,8,5,0],
@@ -996,7 +996,7 @@ const FOODS = [
   // Sweets and bakery
   [["gulab jamun"],"1 (50 g)",50,150,2,22,6,0.3,15],
   [["rasgulla","rosogolla"],"1 (50 g)",50,120,2,25,1.5,0,22],
-  [["jalebi"],"50 g",50,190,1.5,28,8,0.3,20],
+  [["jalebi"],"1 piece (25 g)",25,95,0.8,14,4,0.2,0],
   [["besan ladoo","ladoo","laddu","laddoo"],"1 (40 g)",40,180,3.5,20,10,1,12],
   [["kaju katli","barfi","burfi"],"1 piece (20 g)",20,90,1.8,11,4.5,0.3,8],
   [["kheer","payasam"],"1 bowl (150 g)",150,220,6,32,7,0.5,18],
@@ -1276,13 +1276,31 @@ function matchBuiltin(p) {
   for (const [a, f] of ALIASES) if (ALIAS_RE.get(a).test(p)) return f;
   return null;
 }
-const splitParts = text => text.toLowerCase().split(/,|;|\n|\+|&|\band\b|\bwith\b|\bin\b/).map(s => s.trim()).filter(Boolean);
+// Plates made of parts. Each part becomes its own item with its own amount; a number typed with the plate
+// ("3 pav bhaji") counts the bread or jalebi, and the rest starts at 1 serving.
+const COMBOS = [
+  { re: /\b(?:pav|paav) bhaji\b/, parts: [["butter pav", 2, true], ["bhaji", 1]] },
+  { re: /\b(?:chhole|chole)[ -]bhatur[ae]?\b/, parts: [["chhole", 1], ["bhatura", 2, true]] },
+  { re: /\bpoha[ -]jalebi\b/, parts: [["poha", 1], ["jalebi", 2, true]] },
+];
+function comboItems(p) {
+  const c = COMBOS.find(x => x.re.test(p));
+  if (!c) return null;
+  const q = qtyOf(p);
+  return c.parts.map(([alias, n, counted]) => {
+    const f = ALIASES.find(([a]) => a === alias)[1];
+    return makeItem(cap(f[0][0]), builtinBase(f), counted && q && q.n ? q.n : n, "Built-in list");
+  });
+}
+const splitParts = text =>text.toLowerCase().split(/,|;|\n|\+|&|\band\b|\bwith\b|\bin\b/).map(s => s.trim()).filter(Boolean);
 function localEstimate(text) {
   const parts = splitParts(text);
   const hist = historyFoods(), items = [], missed = [];
   for (const p of parts) {
     const mf = myFoodMatch(p);
     if (mf) { items.push(myFoodItem(p, mf)); continue; } // your own foods come first
+    const combo = comboItems(p);
+    if (combo) { items.push(...combo); continue; }
     const q = qtyOf(p), hm = matchHistory(p, hist), bf = matchBuiltin(p);
     if (hm && (hm.strong || !bf)) {
       const e = hm.h.e, base = baseOf(e);
@@ -1523,13 +1541,16 @@ async function aiEstimate(text, onModel = () => {}) {
   return { items, model: used, fellBack: used !== first };
 }
 async function estimateAI(text) {
-  // Anything that matches My foods uses your own numbers; only the rest goes to Gemini
+  // Anything that matches My foods or a mess plate (pav bhaji…) uses those numbers; only the rest goes to Gemini
   const parts = splitParts(text), mine = [], rest = [];
-  for (const p of parts) { const f = myFoodMatch(p); f ? mine.push(myFoodItem(p, f)) : rest.push(p); }
+  for (const p of parts) {
+    const f = myFoodMatch(p), combo = !f && comboItems(p);
+    if (f) mine.push(myFoodItem(p, f)); else if (combo) mine.push(...combo); else rest.push(p);
+  }
   if (mine.length) {
     state.pending = [...(state.pending || []), ...mine];
     renderPreview();
-    if (!rest.length) { setMsg(`All from My foods (${mine.length} item${mine.length === 1 ? "" : "s"}). Check the amounts, then add.`); return; }
+    if (!rest.length) { setMsg(`All from My foods or the built-in list (${mine.length} item${mine.length === 1 ? "" : "s"}). Check the amounts, then add.`); return; }
     text = rest.join(", ");
   }
   $("estimateBtn").disabled = true;
