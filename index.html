@@ -215,6 +215,8 @@ textarea { width: 100%; min-height: 76px; resize: vertical; border: 1px solid va
 .items .item:first-child { border-top: 0; }
 .item .name { font-weight: 500; overflow-wrap: anywhere; }
 .item .portion { color: var(--muted); font-size: .82rem; }
+.savelink { font-size: .78rem; padding: 2px 0; }
+.savedtag { font-size: .78rem; color: var(--muted); }
 .item .kc { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-weight: 500; text-align: right; white-space: nowrap; }
 .macros { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--f-mono); font-size: .78rem; color: var(--muted); }
 .macros i { font-style: normal; display: inline-flex; align-items: center; gap: 4px; }
@@ -505,6 +507,33 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
     </section>
   </div>
 
+  <!-- SETTINGS: my foods -->
+  <div class="page" id="page-foods" hidden>
+    <div class="page-head"><div><h2 class="page-title">My foods</h2><div class="hint">Your own foods with exact numbers, used before AI and the built-in list</div></div></div>
+    <section class="card" id="myFoodsList" aria-label="My foods"></section>
+    <section class="card" aria-label="Add a food">
+      <div class="sect-head"><h2 class="sect-title" id="foodFormTitle">Add a food</h2><span class="hint">Values for one portion. Copy them from a label, or weigh it once. Leave calories empty to work them out from protein, carbs and fat.</span></div>
+      <form id="foodForm" class="mgrid">
+        <label class="field" style="grid-column:1/-1">Name<input id="ff-name" required maxlength="80" placeholder="e.g. Bhatura"></label>
+        <label class="field" style="grid-column:1/-1">Also called (optional, separate with commas)<input id="ff-aliases" maxlength="200" placeholder="e.g. bhature, puri bhatura"></label>
+        <label class="field" style="grid-column:span 2">Portion<input id="ff-label" maxlength="60" placeholder="e.g. 1 medium (80 g)"></label>
+        <label class="field">Grams per portion<input id="ff-g" type="number" min="0" step="1" inputmode="decimal" placeholder="Optional"></label>
+        <label class="field">Calories<input id="ff-kcal" type="number" min="0" step="1" inputmode="decimal" placeholder="Auto"></label>
+        <label class="field">Protein (g)<input id="ff-protein" type="number" min="0" step="0.1" inputmode="decimal" value="0"></label>
+        <label class="field">Carbs (g)<input id="ff-carbs" type="number" min="0" step="0.1" inputmode="decimal" value="0"></label>
+        <label class="field">Fat (g)<input id="ff-fat" type="number" min="0" step="0.1" inputmode="decimal" value="0"></label>
+        <label class="field">Fiber (g)<input id="ff-fiber" type="number" min="0" step="0.1" inputmode="decimal" value="0"></label>
+        <label class="field">“Small” is ×<input id="ff-small" type="number" min="0.1" max="1" step="0.05" inputmode="decimal" value="0.75"></label>
+        <label class="field">“Large” is ×<input id="ff-large" type="number" min="1" max="3" step="0.05" inputmode="decimal" value="1.3"></label>
+      </form>
+      <div class="row-actions">
+        <button class="primary" type="submit" form="foodForm" id="foodSave">Save food</button>
+        <button class="linkbtn" type="button" id="foodCancel" hidden>Cancel editing</button>
+      </div>
+      <div class="msg" id="foodMsg" role="status"></div>
+    </section>
+  </div>
+
   <!-- SETTINGS: account -->
   <div class="page" id="page-account" hidden>
     <div class="page-head"><div><h2 class="page-title">Account</h2><div class="hint">Sign-in, syncing and backups</div></div></div>
@@ -671,6 +700,55 @@ const EXAMPLES = ["2 boiled eggs and 2 slices of brown bread", "1 bowl rajma wit
 // Built-in foods. Per serving: [aliases, portion, grams per serving, kcal, protein, carbs, fat, fiber]
 // Typical published values for home-style recipes. (A trailing added-sugar column from an earlier version is ignored.)
 const FOODS = [
+  // IIIT Allahabad BH1/BH4 mess. Portions are mess servings: dal, sabzi and gravies 150 ml (dry sabzis about 100 g),
+  // rice 100 g cooked (rice dishes 100 g of rice plus what's cooked into it), roti medium. Fried breads are napkin-blotted
+  // (about 20% less absorbed oil) and floating oil is skimmed off dals and gravies (about 3–5 g of oil left per katori).
+  // These come first, so when a name also appears further down (puri, dal, chole…), the mess version wins.
+  [["chhole bhature","chole bhature","chhole-bhature","chole-bhature","amritsari chhole-bhature","amritsari chhole bhature"],"1 serving chhole + 2 bhature",330,802,20.3,111.5,30.5,10.5,0],
+  [["puri","poori","ajwain puri","mess puri"],"1 (30 g)",30,109,2.4,14,4.8,2,0],
+  [["bhatura","bhature","amritsari bhatura","amritsari bhature"],"1 (90 g)",90,296,6,42,11.6,1.5,0],
+  [["amritsari chhole","amritsari chole","chhole","chole","chana masala"],"1 serving (150 ml)",150,209,8.3,27.5,7.3,7.5,0],
+  [["kaddu chola","kaddu chana"],"1 serving (150 ml)",150,141,5,18.5,5.2,4.5,0],
+  [["kaddu","kaddu sabzi","pumpkin sabzi","sitaphal"],"1 serving (150 ml)",150,90,1.5,12,4,2,0],
+  [["mix dal","mixed dal"],"1 serving (150 ml)",150,132,7.2,18,3.5,3.5,0],
+  [["arhar dal","toor dal","dal"],"1 serving (150 ml)",150,130,6.6,18,3.5,4.5,0],
+  [["chana dal tadka","chana dal"],"1 serving (150 ml)",150,145,6.6,18,5.2,5,0],
+  [["dal makhani"],"1 serving (150 ml)",150,155,7,17,6.5,5,0],
+  [["rajma","rajma masala"],"1 serving (150 ml)",150,152,8,21,4,5.5,0],
+  [["kaala channa","kaala chana","kala chana","black chana"],"1 serving (150 ml)",150,178,8,24,5.5,6.8,0],
+  [["kadhi","kadhi pakora","kadhi pakoda"],"1 serving (150 ml)",150,151,6,13,8.3,1.5,0],
+  [["sambhar","sambar"],"1 serving (150 ml)",150,76,3,11,2.2,3,0],
+  [["kadhai paneer","kadai paneer"],"1 serving (150 ml)",150,231,11.5,8,17,2,0],
+  [["egg curry","anda curry"],"2 eggs with gravy (200 g)",200,208,13.6,7,14,1.5,0],
+  [["veg kofta","kofta curry","lauki kofta"],"2 kofta with gravy (200 g)",200,201,5,16,13,3,0],
+  [["chicken butter masala"],"1 serving (150 ml, about 4 pieces)",150,230,19,7,14,1,0],
+  [["soya chunks dry","dry soya chunks","soya chunks sabzi","soya chunk sabzi","soya sabzi"],"1 serving (150 ml, 100 g)",100,136,13.3,10.8,4.4,3.3,0],
+  [["aloo bhujia","aloo ki bhujia"],"1 serving (150 ml, 100 g)",100,109,1.7,14.2,5.1,1.7,0],
+  [["cabbage aloo","aloo cabbage","patta gobi aloo","bandh gobi aloo"],"1 serving (150 ml, 100 g)",100,80,1.7,8.7,4.3,2.3,0],
+  [["gobi aloo","gobhi aloo","aloo gobi","aloo gobhi"],"1 serving (150 ml, 100 g)",100,83,2.2,8.8,4.3,2.5,0],
+  [["aloo tamatar","aloo tamatar sabzi"],"1 serving (150 ml)",150,104,2,16,3.6,2.5,0],
+  [["mix veg","mixed veg","mixed vegetable"],"1 serving (150 ml)",150,98,3,12,4.2,4,0],
+  [["rice","plain rice","white rice","chawal"],"1 serving (100 g cooked)",100,130,2.7,28.2,0.3,0.4,0],
+  [["soya fried rice","veg soya fried rice","soya chunks fried rice"],"1 serving (133 g)",133,198,6.8,32.9,4.4,1.7,0],
+  [["fried rice","veg fried rice"],"1 serving (133 g)",133,175,3.3,30.7,4.3,1.3,0],
+  [["lemon rice"],"1 serving (133 g)",133,201,3.3,32,6.7,1.3,0],
+  [["tehri","tahri","tehari"],"1 serving (143 g)",143,194,3.8,32.8,5.3,1.4,0],
+  [["paav bhaji","pav bhaji"],"2 pav + 1 serving bhaji",235,401,11,60,13,6,0],
+  [["poha jalebi","poha-jalebi"],"1 plate poha + 2 jalebi",250,446,6,75,13.5,3,0],
+  [["stuffed dosa"],"1 (200 g)",200,324,6,48,12,4,0],
+  [["stuffed paratha","gobi aloo paratha","aloo gobi paratha","gobi paratha","gobhi paratha"],"1 (120 g)",120,282,7.5,45,8,7,0],
+  [["dahi"],"1 katori (100 g)",100,62,3.5,4.7,3.3,0,0],
+  [["boondi raita"],"1 serving (150 ml)",150,149,5.5,12.5,8.5,0.5,0],
+  [["rooh afza lassi","roohafza lassi","rooh afza"],"1 glass (250 ml)",250,208,5,38,4,0,0],
+  [["peanut chutney","moongphali chutney","mungfali chutney"],"2 tbsp (30 g)",30,83,3,2,7,1,0],
+  [["garlic peanut chutney","garlic chutney","lehsun chutney"],"1 tbsp (15 g)",15,57,1.6,1.5,5,0.6,0],
+  [["green chutney","hari chutney","pudina chutney","dhaniya chutney"],"1 tbsp (15 g)",15,8,0.4,1.5,0.1,0.6,0],
+  [["red chutney","lal chutney","tomato chutney"],"1 tbsp (15 g)",15,20,0.3,2.5,1,0.4,0],
+  [["imli chutney","saunth chutney","saunth","meethi chutney","tamarind chutney"],"1 tbsp (20 g)",20,41,0.2,10,0,0.3,0],
+  [["fried chilli","fried chili","fried mirch","tali mirch"],"1 (8 g)",8,12,0.1,0.6,1,0.2,0],
+  [["sewai","sevai","seviyan","sevaiyan","vermicelli kheer"],"1 serving (150 ml)",150,208,6.1,29.5,7.3,0.5,0],
+  [["kalakand"],"1 piece (40 g)",40,146,4,18,6.4,0,0],
+  [["milk cake"],"1 piece (40 g)",40,162,3.2,21,7.2,0,0],
   // Breads and grains
   [["roti","chapati","chapatti","phulka"],"1 medium (40 g)",40,104,3,18,2.5,2.7,0],
   [["tandoori roti"],"1 (50 g)",50,140,4.5,26,2,3.5,0],
@@ -753,14 +831,37 @@ const FOODS = [
   [["kadhi"],"1 bowl (200 g)",200,160,5,12,10,1,1],
   [["sambhar"],"1 bowl (200 g)",200,130,6,18,4,5,0],
   [["aloo gobi"],"1 bowl (150 g)",150,160,3.5,17,9,4,0],
-  [["bhindi","okra"],"1 bowl (150 g)",150,140,3,12,9,5,0],
+  [["bhindi","bhindi masala","okra"],"1 katori (100 g)",100,94,2,8,6,3.3,0],
+  // Home-style sabzis: dry ones 1 katori (about 100 g) with about 5 g oil, gravies 1 katori (150 g) with about 6 g oil
+  [["aloo shimla mirch","aloo shimlamirch","shimla mirch aloo","aloo capsicum","capsicum aloo","shimla mirch"],"1 katori (100 g)",100,102,1.6,12.3,5.1,2,0],
+  [["lauki chana dal","lauki chana"],"1 katori (150 g)",150,107,4.5,12,4.5,3,0],
+  [["lauki","lauki sabzi","ghiya","dudhi","bottle gourd"],"1 katori (150 g)",150,65,1,6,4.1,1.5,0],
+  [["tinde","tinda","tinday","round gourd"],"1 katori (100 g)",100,71,1.3,5,5.1,1.6,0],
+  [["tori","torai","turai","ridge gourd"],"1 katori (100 g)",100,59,1,4.5,4.1,1.5,0],
+  [["parwal","parval","pointed gourd"],"1 katori (100 g)",100,71,1.8,4.5,5.1,2.6,0],
+  [["karela","karele","bitter gourd"],"1 katori (100 g)",100,98,1.5,7,7.1,2.5,0],
+  [["arbi","arbi sabzi","colocasia","taro"],"1 katori (100 g)",100,157,1.4,24,6.1,3.7,0],
+  [["jeera aloo","aloo jeera"],"1 katori (100 g)",100,129,1.9,16.6,6.1,2,0],
+  [["aloo matar","matar aloo","aloo mutter"],"1 katori (150 g)",150,145,3.3,19.3,6.1,3.8,0],
+  [["aloo methi","methi aloo"],"1 katori (100 g)",100,116,2.5,13.8,5.6,2.2,0],
+  [["aloo palak","palak aloo"],"1 katori (150 g)",150,119,3.6,12.1,6.2,3,0],
+  [["aloo baingan","baingan aloo"],"1 katori (100 g)",100,99,1.3,9.6,6.1,2.5,0],
+  [["beans aloo","aloo beans","french beans","beans sabzi","beans"],"1 katori (100 g)",100,91,1.8,9.4,5.1,2.4,0],
+  [["gajar matar","matar gajar"],"1 katori (100 g)",100,100,2.5,10.8,5.2,3.5,0],
+  [["patta gobi","cabbage sabzi","bandh gobi","band gobhi"],"1 katori (100 g)",100,74,1.3,5.6,5.1,2.2,0],
+  [["phool gobi","gobi","gobhi","cauliflower sabzi"],"1 katori (100 g)",100,74,1.8,5.2,5.1,2,0],
+  [["sarson ka saag","sarson saag","saag"],"1 katori (150 g)",150,145,4,12,9,4.5,0],
+  [["kathal","kathal sabzi","jackfruit sabzi"],"1 katori (150 g)",150,182,2.3,27,7.2,2.5,0],
+  [["mushroom matar","matar mushroom","mushroom masala"],"1 katori (150 g)",150,118,3.8,9.6,7.2,2.8,0],
+  [["lobia","lobiya","rongi","black eyed peas"],"1 katori (150 g)",150,166,8,21,5.5,3.8,0],
+  [["malai kofta"],"2 kofta with gravy (200 g)",200,346,8,20,26,2.5,0],
   [["aloo sabzi","potato curry","aloo curry","dum aloo"],"1 bowl (150 g)",150,170,3,22,8,3,0],
   [["baingan bharta","baingan"],"1 bowl (150 g)",150,130,3,12,8,5,0],
   [["sabzi","mixed veg","vegetable curry","veg curry"],"1 bowl (150 g)",150,150,4,15,8,5,0],
-  [["palak paneer"],"1 bowl (200 g)",200,300,14,10,23,4,0],
+  [["palak paneer"],"1 katori (150 g)",150,227,10.5,7.5,17.2,3,0],
   [["paneer butter masala","butter paneer"],"1 bowl (200 g)",200,400,16,14,32,2,4],
   [["shahi paneer"],"1 bowl (200 g)",200,420,15,14,34,2,5],
-  [["matar paneer"],"1 bowl (200 g)",200,330,14,16,23,4,2],
+  [["matar paneer","mutter paneer"],"1 katori (150 g)",150,246,10.5,12,17.3,3,0],
   [["paneer tikka"],"150 g",150,330,22,8,23,1.5,0],
   [["paneer bhurji"],"150 g",150,320,18,8,24,1.5,0],
   [["paneer","cottage cheese"],"100 g",100,265,18,3.5,20,0,0],
@@ -829,7 +930,7 @@ const FOODS = [
   [["greek yogurt","hung curd"],"1 cup (170 g)",170,100,17,6,0.7,0,0],
   [["flavoured yogurt","flavored yogurt","fruit yogurt"],"100 g",100,100,3.5,15,3,0,11],
   [["curd","yogurt","dahi"],"1 cup (245 g)",245,150,8.5,11.4,8,0,0],
-  [["buttermilk","chaas","chhach"],"1 glass (250 ml)",250,60,3.5,5,3,0,0],
+  [["buttermilk","chaas","chhach","chaach","chhaach"],"1 glass (250 ml)",250,60,3.5,5,3,0,0],
   [["sweet lassi","lassi"],"1 glass (250 ml)",250,220,8,34,6,0,22],
   [["skim milk","skimmed milk"],"1 cup (240 ml)",240,83,8.3,12,0.2,0,0],
   [["almond milk"],"1 cup unsweetened (240 ml)",240,30,1,1,2.5,0.5,0],
@@ -921,7 +1022,7 @@ const FOODS = [
   [["mayonnaise","mayo"],"1 tbsp (14 g)",14,94,0.1,0.1,10.3,0,0.1],
   [["ketchup","tomato sauce"],"1 tbsp (17 g)",17,19,0.2,4.5,0,0.1,3.7],
   [["hummus"],"2 tbsp (30 g)",30,50,2.4,4.3,2.9,1.8,0],
-  [["pickle","achar"],"1 tbsp (15 g)",15,30,0.3,1,2.8,0.4,0],
+  [["pickle","achar","achaar"],"1 tbsp (15 g)",15,30,0.3,1,2.8,0.4,0],
   [["jam"],"1 tbsp (20 g)",20,56,0,14,0,0,10],
   [["nutella"],"1 tbsp (19 g)",19,100,1,11,6,0.5,10],
   [["honey","shahad"],"1 tbsp (21 g)",21,64,0,17,0,0,17],
@@ -1175,21 +1276,125 @@ function matchBuiltin(p) {
   for (const [a, f] of ALIASES) if (ALIAS_RE.get(a).test(p)) return f;
   return null;
 }
+const splitParts = text => text.toLowerCase().split(/,|;|\n|\+|&|\band\b|\bwith\b|\bin\b/).map(s => s.trim()).filter(Boolean);
 function localEstimate(text) {
-  const parts = text.toLowerCase().split(/,|;|\n|\+|&|\band\b|\bwith\b|\bin\b/).map(s => s.trim()).filter(Boolean);
+  const parts = splitParts(text);
   const hist = historyFoods(), items = [], missed = [];
   for (const p of parts) {
+    const mf = myFoodMatch(p);
+    if (mf) { items.push(myFoodItem(p, mf)); continue; } // your own foods come first
     const q = qtyOf(p), hm = matchHistory(p, hist), bf = matchBuiltin(p);
     if (hm && (hm.strong || !bf)) {
       const e = hm.h.e, base = baseOf(e);
       items.push(makeItem(e.name, base, servingsFor(q, base, e.base ? (e.servings || 1) : 1), "From your log"));
     } else if (bf) {
-      const base = builtinBase(bf);
+      const base = sizedBase(builtinBase(bf), p);
       items.push(makeItem(cap(bf[0][0]), base, servingsFor(q, base, 1), "Built-in list"));
     } else missed.push(p);
   }
   return { items, missed };
 }
+
+/* ---------- My foods: your own foods with exact numbers, saved with your goals so they sync ---------- */
+const myFoods = () => state.goals.myFoods || [];
+const SIZES = { small: "small", mini: "small", little: "small", medium: "medium", regular: "medium", normal: "medium", large: "large", big: "large", jumbo: "large" };
+// The food whose name (or other name) is fully inside this part of the description; longer names win
+function myFoodMatch(p) {
+  const st = new Set(tokens(p));
+  let best = null;
+  for (const f of myFoods()) for (const n of [f.name, ...(f.aliases || [])]) {
+    const t = tokens(n);
+    if (t.length && t.every(x => st.has(x)) && (!best || t.length > best.len)) best = { f, len: t.length };
+  }
+  return best && best.f;
+}
+// Small and large scale the usual portion (unless a weight was typed)
+function sizedBase(base, p, small = 0.75, large = 1.3) {
+  const q = qtyOf(p), sw = p.match(/\b(small|mini|little|medium|regular|normal|large|big|jumbo)\b/), size = sw && SIZES[sw[1]];
+  if (!size || size === "medium" || (q && q.grams != null)) return base;
+  const mult = size === "small" ? small : large, sized = { label: `1 ${size}${base.g ? ` (${Math.round(base.g * mult)} g)` : ""}`, g: base.g ? base.g * mult : null };
+  for (const n of NUTS) sized[n.k] = base[n.k] * mult;
+  return sized;
+}
+// "medium sized bhatura x 3" → 3 × your medium bhatura
+function myFoodItem(p, f) {
+  const base = { label: f.label || "1 portion", g: f.g || null };
+  for (const n of NUTS) base[n.k] = Number(f[n.k]) || 0;
+  const sized = sizedBase(base, p, f.small || 0.75, f.large || 1.3);
+  return makeItem(f.name, sized, servingsFor(qtyOf(p), sized, 1), "My foods");
+}
+const inMyFoods = name => myFoods().some(f => f.name.trim().toLowerCase() === String(name).trim().toLowerCase());
+// Save a logged or estimated item as one portion of a food
+function saveAsMyFood(e) {
+  if (inMyFoods(e.name)) { toast(`${e.name} is already in My foods.`); return; }
+  const b = baseOf(e), f = { id: uid(), name: String(e.name).slice(0, 80), aliases: [], label: b.label, g: b.g || null, small: 0.75, large: 1.3 };
+  for (const n of NUTS) f[n.k] = n.k === "kcal" ? Math.round(b[n.k] || 0) : r1(b[n.k]);
+  state.goals.myFoods = [...myFoods(), f];
+  store.saveGoals(); render(); renderPreview();
+  toast(`Saved ${f.name} to My foods (${f.label}). Edit it in Settings → My foods.`);
+}
+function renderMyFoods() {
+  const list = [...myFoods()].sort((a, b) => a.name.localeCompare(b.name));
+  $("myFoodsList").innerHTML = `<div class="sect-head"><h2 class="sect-title">Saved foods</h2><span class="hint">${list.length} saved · typed amounts and the words small, medium and large are understood</span></div>` + (list.length
+    ? `<ul class="items" style="margin:0">${list.map(f => `<li class="item">
+        <div><div class="name">${esc(f.name)}</div><div class="portion">${esc(f.label || "1 portion")}${f.aliases && f.aliases.length ? ` · also “${f.aliases.map(esc).join("”, “")}”` : ""}</div></div>
+        <div class="kc">${Math.round(f.kcal)} kcal</div>
+        <div class="row-actions" style="gap:2px;flex-wrap:nowrap"><button class="linkbtn" data-editfood="${f.id}">Edit</button><button class="del" data-delfood="${f.id}" aria-label="Delete ${esc(f.name)}">×</button></div>
+        ${macroLine(f)}
+      </li>`).join("")}</ul>`
+    : `<div class="empty">Nothing saved yet. Add a food below, or tap <b>Save to My foods</b> under anything you've logged.</div>`);
+}
+let editingFood = null;
+function editFood(id) {
+  const f = myFoods().find(x => x.id === id);
+  if (!f) return;
+  editingFood = id;
+  $("ff-name").value = f.name; $("ff-aliases").value = (f.aliases || []).join(", "); $("ff-label").value = f.label || ""; $("ff-g").value = f.g ?? "";
+  for (const n of NUTS) $("ff-" + n.k).value = f[n.k];
+  $("ff-small").value = f.small || 0.75; $("ff-large").value = f.large || 1.3;
+  $("foodFormTitle").textContent = `Edit ${f.name}`; $("foodSave").textContent = "Save changes"; $("foodCancel").hidden = false;
+  $("foodForm").scrollIntoView({ behavior: "smooth", block: "center" }); $("ff-name").focus();
+}
+function resetFoodForm() {
+  editingFood = null;
+  $("foodForm").reset();
+  $("foodFormTitle").textContent = "Add a food"; $("foodSave").textContent = "Save food"; $("foodCancel").hidden = true;
+}
+function saveFoodForm() {
+  const v = id => $(id).value.trim(), num = id => (v(id) === "" ? null : Number(v(id).replace(",", ".")));
+  const name = v("ff-name");
+  if (!name) return authMsg("foodMsg", "Give the food a name.", true);
+  if (myFoods().some(f => f.id !== editingFood && f.name.toLowerCase() === name.toLowerCase())) return authMsg("foodMsg", `You already have a food called ${name}.`, true);
+  const f = { id: editingFood || uid(), name: name.slice(0, 80), aliases: v("ff-aliases").split(",").map(s => s.trim()).filter(Boolean).slice(0, 10),
+    label: v("ff-label") || (num("ff-g") ? `1 portion (${num("ff-g")} g)` : "1 portion"), g: num("ff-g") || null,
+    small: Math.min(1, Math.max(0.1, num("ff-small") || 0.75)), large: Math.min(3, Math.max(1, num("ff-large") || 1.3)) };
+  for (const k of ["protein", "carbs", "fat", "fiber"]) f[k] = r1(Math.max(0, num("ff-" + k) || 0));
+  f.kcal = num("ff-kcal") != null ? Math.round(num("ff-kcal")) : macroKcal(f);
+  if (!(f.kcal > 0)) return authMsg("foodMsg", "Enter the calories, or the protein, carbs and fat.", true);
+  state.goals.myFoods = editingFood ? myFoods().map(x => (x.id === editingFood ? f : x)) : [...myFoods(), f];
+  store.saveGoals(); renderMyFoods(); resetFoodForm();
+  authMsg("foodMsg", `Saved ${f.name}: ${f.kcal} kcal per ${f.label}.`);
+}
+function deleteFood(id) {
+  const f = myFoods().find(x => x.id === id);
+  if (!f) return;
+  state.goals.myFoods = myFoods().filter(x => x.id !== id);
+  store.saveGoals(); renderMyFoods(); render();
+  toast(`Deleted ${f.name}`, () => { state.goals.myFoods = [...myFoods(), f]; store.saveGoals(); renderMyFoods(); render(); });
+}
+document.addEventListener("click", e => {
+  const t = e.target;
+  const sf = t.closest("[data-savefood]");
+  if (sf) { const x = (state.days[sf.dataset.date] || []).find(y => y.id === sf.dataset.savefood); if (x) saveAsMyFood(x); return; }
+  const sp = t.closest("[data-savepending]");
+  if (sp) { const x = (state.pending || []).find(y => y.id === sp.dataset.savepending); if (x) saveAsMyFood(x); return; }
+  const ed = t.closest("[data-editfood]");
+  if (ed) { editFood(ed.dataset.editfood); return; }
+  const df = t.closest("[data-delfood]");
+  if (df) { deleteFood(df.dataset.delfood); return; }
+  if (t.id === "foodCancel") { resetFoodForm(); authMsg("foodMsg", ""); }
+});
+document.addEventListener("submit", e => { if (e.target.id === "foodForm") { e.preventDefault(); saveFoodForm(); } });
 
 /* ---------- AI estimates: Google Gemini with the user's own free key, kept on this device ---------- */
 const AI_KEY = "macro-ledger-gemini-key", AI_MODEL = "macro-ledger-gemini-model", EST_MODE = "macro-ledger-est-mode";
@@ -1251,7 +1456,10 @@ Estimate the nutrition of each food in the description below.
 Reply with only JSON in exactly this shape:
 {"items":[{"name":"Roti","portion":"2 medium (80 g)","kcal":208,"protein":6,"carbs":36,"fat":5,"fiber":5.4}]}
 If the text contains no food, reply {"items":[]}.
-
+${myFoods().length ? `
+The person has measured these foods themselves (values per portion). If something below is the same food or very close to it, base your estimate on these numbers:
+${myFoods().slice(0, 40).map(f => `- ${f.name}, ${f.label}: ${Math.round(f.kcal)} kcal, protein ${f.protein} g, carbs ${f.carbs} g, fat ${f.fat} g, fiber ${f.fiber} g`).join("\n")}
+` : ""}
 Food description:
 ${text.slice(0, 2000)}`;
 }
@@ -1315,6 +1523,15 @@ async function aiEstimate(text, onModel = () => {}) {
   return { items, model: used, fellBack: used !== first };
 }
 async function estimateAI(text) {
+  // Anything that matches My foods uses your own numbers; only the rest goes to Gemini
+  const parts = splitParts(text), mine = [], rest = [];
+  for (const p of parts) { const f = myFoodMatch(p); f ? mine.push(myFoodItem(p, f)) : rest.push(p); }
+  if (mine.length) {
+    state.pending = [...(state.pending || []), ...mine];
+    renderPreview();
+    if (!rest.length) { setMsg(`All from My foods (${mine.length} item${mine.length === 1 ? "" : "s"}). Check the amounts, then add.`); return; }
+    text = rest.join(", ");
+  }
   $("estimateBtn").disabled = true;
   const started = Date.now();
   let asking = "Gemini", tries = 0;
@@ -1616,9 +1833,12 @@ function mealsHTML(date, scope) {
   }).join("") + (anything && scope === "hist" ? factsPanel(totals(entries)) : "");
 }
 
+const saveLink = (e, attrs) => (e.source === "My foods" || inMyFoods(e.name)
+  ? `<span class="savedtag">★ In My foods</span>`
+  : `<button class="linkbtn savelink" ${attrs}>☆ Save to My foods</button>`);
 function itemRow(e, date) {
   return `<li class="item">
-    <div><div class="name">${esc(e.name)}</div>${e.portion ? `<div class="portion">${esc(e.portion)}</div>` : ""}</div>
+    <div><div class="name">${esc(e.name)}</div>${e.portion ? `<div class="portion">${esc(e.portion)}</div>` : ""}${saveLink(e, `data-savefood="${esc(e.id)}" data-date="${date}"`)}</div>
     <div class="kc">${Math.round(e.kcal)} kcal</div>
     <button class="del" data-remove="${esc(e.id)}" data-date="${date}" aria-label="Remove ${esc(e.name)}">×</button>
     ${macroLine(e)}
@@ -1657,7 +1877,7 @@ function renderPreview() {
           <div class="serv">
             <label>Amount <input type="number" min="0" step="${grams ? 5 : 0.25}" inputmode="decimal" data-serv="${e.id}" value="${grams ? Math.round(e.servings * 100) : e.servings}"></label>
             <span>${grams ? "g" : "× " + esc(e.base.label)}</span>
-            <span class="tag plain">${esc(e.source)}</span>${e.note ? `<span class="tag warn">${esc(e.note)}</span>` : ""}
+            <span class="tag plain">${esc(e.source)}</span>${e.note ? `<span class="tag warn">${esc(e.note)}</span>` : ""}${saveLink(e, `data-savepending="${e.id}"`)}
           </div>
           ${macroLine(e)}
         </li>`;
@@ -2596,7 +2816,7 @@ async function importBackup(file) {
   }
   if (data.goals && typeof data.goals === "object") {
     for (const n of NUTS) if (Number(data.goals[n.k]) > 0) state.goals[n.k] = Number(data.goals[n.k]);
-    for (const k of ["weightGoal", "weightStart", "weightSince", "hidden", "body", "plan"]) if (data.goals[k] != null) state.goals[k] = data.goals[k];
+    for (const k of ["weightGoal", "weightStart", "weightSince", "hidden", "body", "plan", "myFoods"]) if (data.goals[k] != null) state.goals[k] = data.goals[k];
     store.saveGoals();
   }
   render();
@@ -2710,6 +2930,7 @@ const TOUR = [
   { mode: "settings", tab: "goals", target: "#pl-plan > .pgroup:nth-child(1)", where: "Settings · Goals", title: "About you", text: "Your sex, age, height, weight and activity level give a first estimate of your maintenance calories: what you burn in a day." },
   { mode: "settings", tab: "goals", target: "#pl-plan > .pgroup:nth-child(2)", where: "Settings · Goals", title: "Pick a plan", text: "Fat loss, Body recomposition or Lean bulk use research-backed paces. Custom lets you pick a goal weight and a time (within healthy limits), and My own numbers lets you type your own targets." },
   { mode: "settings", tab: "goals", target: "#pl-out", where: "Settings · Goals", title: "Your daily targets", text: "Your maintenance, daily calories and macros, and when you'll reach your goal. Calories always add up from your macros. After a few weeks of weigh-ins and food logs, the app learns your real maintenance and adjusts these by itself." },
+  { mode: "settings", tab: "foods", target: "#myFoodsList", where: "Settings · My foods", title: "My foods", text: "Save foods you eat often with exact numbers, from a label or weighed once. Typing “2 large bhatura” then uses your numbers, scaled for size, before AI or the built-in list. You can also tap “Save to My foods” under anything you've logged." },
   { mode: "main", tab: "home", where: "Done", title: "You're ready", text: "Start by logging your next meal on the Log tab. You can replay this tour any time from Settings → Account." },
 ];
 let tourI = -1;
@@ -2803,10 +3024,10 @@ function toast(text, undo) {
 // and settings (Goals / Account).
 const PAGES = ["home", "log", "history"];
 const WPAGES = ["whome", "wlog", "whist"];
-const SET_TABS = ["goals", "account"];
+const SET_TABS = ["goals", "foods", "account"];
 const TABS = { main: PAGES, weight: WPAGES, settings: SET_TABS };
 const TAB_ATTR = { main: "go", weight: "wgo", settings: "set" };
-const TAB_LABELS = { home: "Home", log: "Log", history: "History", whome: "Home", wlog: "Log", whist: "History", goals: "Goals", account: "Account" };
+const TAB_LABELS = { home: "Home", log: "Log", history: "History", whome: "Home", wlog: "Log", whist: "History", goals: "Goals", foods: "My foods", account: "Account" };
 const LEDGER = {
   main: { brand: "Macro<span>Ledger</span>", switchIcon: "body", switchLabel: "Open WeightLedger" },
   weight: { brand: "Weight<span>Ledger</span>", switchIcon: "plate", switchLabel: "Back to MacroLedger" },
@@ -2858,7 +3079,7 @@ function switchTab(next, animate = true) {
 const go = (page, animate = true) => switchTab(page, animate);
 
 function applyMode(to, tab) {
-  if (to === "settings") { state.backMode = state.mode; state.setTab = tab || "goals"; renderGoalsForm(); renderAccount(); renderThemes(); }
+  if (to === "settings") { state.backMode = state.mode; state.setTab = tab || "goals"; renderGoalsForm(); renderAccount(); renderThemes(); renderMyFoods(); }
   else if (to === "weight") state.wpage = tab || "whome"; // each ledger opens on its Home
   else state.page = tab || "home";
   state.mode = to;
