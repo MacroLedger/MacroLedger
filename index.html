@@ -197,7 +197,23 @@ textarea { width: 100%; min-height: 76px; resize: vertical; border: 1px solid va
 .manual { display: grid; gap: 10px; }
 .mgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
 .field { display: grid; gap: 4px; font-size: .8rem; color: var(--muted); }
-.field input { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--bg); color: var(--ink); font-size: .95rem; width: 100%; min-width: 0; }
+.field input, .field select { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--bg); color: var(--ink); font-size: .95rem; width: 100%; min-width: 0; }
+.field input[readonly] { background: var(--accent-soft); }
+/* Diet plan form */
+.planform { display: grid; gap: 18px; }
+.pgroup { display: grid; gap: 10px; }
+.ptitle { margin: 0; font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.optgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.opt { text-align: left; border: 1px solid var(--line); background: transparent; border-radius: 10px; padding: 8px 12px; display: grid; gap: 2px; }
+.opt b { font-weight: 600; font-size: .9rem; }
+.opt span { font-size: .78rem; color: var(--muted); }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.timerow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.planout { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+.pmacros { font-size: .9rem; }
+.pnote { margin: 0; font-size: .85rem; color: var(--muted); }
+.pnote.warn { color: var(--warn); }
 
 /* Meals */
 .meal { display: grid; gap: 0; }
@@ -347,14 +363,14 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
   <!-- SETTINGS: goals -->
   <div class="page" id="page-goals" hidden>
     <div class="page-head"><div><h2 class="page-title">Goals</h2><div class="hint">What you aim for each day</div></div></div>
-    <section class="card" id="goals" aria-label="Daily goals">
+    <section class="card" id="goals" aria-label="Your plan">
       <div class="sect-head">
-        <h2 class="sect-title">Daily goals</h2>
-        <span class="hint">Calories, carbs and fat are limits. Protein and fiber are targets to reach. The bodyweight goal shows on WeightLedger's Home.</span>
+        <h2 class="sect-title">Your plan</h2>
+        <span class="hint">Your maintenance calories and daily targets come from this. Calories always add up from your macros.</span>
       </div>
-      <form id="goalsForm" class="mgrid"></form>
+      <div id="goalsForm"></div>
       <div class="row-actions">
-        <button class="primary" id="saveGoals" type="button">Save goals</button>
+        <button class="primary" id="saveGoals" type="button">Save plan</button>
         <button class="linkbtn" id="cancelGoals" type="button">Undo changes</button>
       </div>
     </section>
@@ -525,7 +541,7 @@ const NUTS = [
   { k: "fat",     label: "Fat",         short: "F",    unit: "g",    type: "limit" },
   { k: "fiber",   label: "Fiber",       short: "Fib",  unit: "g",    type: "target" },
 ];
-const DEFAULT_GOALS = { kcal: 2000, protein: 120, carbs: 220, fat: 65, fiber: 30 };
+const DEFAULT_GOALS = { kcal: 2005, protein: 125, carbs: 230, fat: 65, fiber: 30 }; // kcal = 4 × protein + 4 × carbs + 9 × fat
 const MEALS = ["Breakfast", "Lunch", "Snacks", "Dinner"];
 const EXAMPLES = ["2 boiled eggs and 2 slices of brown bread", "1 bowl rajma with 1 cup rice", "Chai and 2 marie biscuits", "1 scoop whey in 300 ml milk"];
 
@@ -1340,6 +1356,7 @@ function dayName(date) {
 const longDate = date => parseKey(date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
 function render() {
+  applyPlan(); // targets follow your plan as your weight changes
   const today = todayKey(), g = state.goals;
 
   // Home
@@ -1670,9 +1687,10 @@ function renderHomeWeight() {
   const head = `<div class="sect-head"><h2 class="sect-title">Current vs goal</h2><span class="hint">${s.todayKg != null ? `Weighed in today` : `Not weighed in today · <button class="linkbtn" data-wgo="wlog">Log weight</button>`}</span></div>`;
   if (current == null) { $("home-weight").innerHTML = head + `<div class="empty">Log your first weigh-in on the Log tab to see where you stand.</div>`; return; }
   const currentTile = `<div class="gtile"><span class="k">Current</span><span class="v">${kgFmt(current)}<small>kg</small></span><span class="s">${lastDate === s.today ? "Today" : shortDate(lastDate)}</span></div>`;
+  const plan = planLine(), planHint = plan ? `<span class="hint">${plan}</span>` : "";
   if (g.weightGoal == null) {
     $("home-weight").innerHTML = head + `<div class="goalgrid">${currentTile}
-      <div class="gtile"><span class="k">Goal</span><span class="v">–</span><span class="s"><button class="linkbtn" id="setWeightGoal">Set a bodyweight goal</button></span></div></div>`;
+      <div class="gtile"><span class="k">Goal</span><span class="v">–</span><span class="s"><button class="linkbtn" id="setWeightGoal">Set a bodyweight goal</button></span></div></div>${planHint}`;
     return;
   }
   const goal = g.weightGoal, start = g.weightStart ?? state.weights[Object.keys(state.weights).sort()[0]];
@@ -1686,7 +1704,7 @@ function renderHomeWeight() {
       <div class="gtile"><span class="k">${reached ? "Goal" : "To go"}</span><span class="v">${reached ? "Reached" : kgFmt(left) + "<small>kg</small>"}</span><span class="s">${reached ? `${kgFmt(Math.abs(current - goal))} kg past it` : losing ? "to lose" : "to gain"}</span></div>
     </div>
     <div class="track" role="progressbar" aria-label="Progress to bodyweight goal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><div class="fill ${pct > 0 && pct < 100 ? "tip" : ""}" style="width:${pct}%;--c:var(--accent)"></div></div>
-    <span class="hint">${done > 0.05 ? `${losing ? "Lost" : "Gained"} ${kgFmt(done)} of ${kgFmt(total)} kg since you set the goal (${Math.round(pct)}%)` : `Starting point ${kgFmt(start)} kg · ${kgFmt(total)} kg ${losing ? "to lose" : "to gain"} in total`}</span>`;
+    <span class="hint">${done > 0.05 ? `${losing ? "Lost" : "Gained"} ${kgFmt(done)} of ${kgFmt(total)} kg since you set the goal (${Math.round(pct)}%)` : `Starting point ${kgFmt(start)} kg · ${kgFmt(total)} kg ${losing ? "to lose" : "to gain"} in total`}</span>${planHint}`;
 }
 
 function renderWeight() {
@@ -1793,18 +1811,349 @@ function toggleShown(k) {
 }
 function renderGoalsForm() {
   renderShowPrefs();
-  $("goalsForm").innerHTML = NUTS.map(n => `<label class="field">${n.label} (${n.unit})<input id="goal-${n.k}" type="number" min="0" step="${n.k === "kcal" ? 10 : 1}" inputmode="decimal" value="${state.goals[n.k]}"></label>`).join("")
-    + `<label class="field">Bodyweight goal (kg)<input id="goal-weight" type="number" min="20" max="400" step="0.1" inputmode="decimal" placeholder="Optional" value="${state.goals.weightGoal ?? ""}"></label>`;
+  $("goalsForm").innerHTML = planFormHTML("pl");
+  updatePlanForm("pl");
 }
 const latestWeightDate = () => Object.keys(state.weights).sort().pop();
 function saveGoals() {
-  for (const n of NUTS) {
-    const v = Number($("goal-" + n.k).value);
-    if (Number.isFinite(v) && v >= 0) state.goals[n.k] = v;
-  }
-  if (!setWeightGoal($("goal-weight").value)) return;
-  store.saveGoals(); render(); renderGoalsForm(); toast("Goals saved");
+  if (savePlan("pl")) { renderGoalsForm(); toast("Plan saved"); }
 }
+
+/* ---------- Diet plan: maintenance calories and daily targets ---------- */
+// Maintenance starts from the Mifflin-St Jeor equation times an activity factor. Once you have a few weeks of
+// weigh-ins and food logs, it moves toward what your own data shows: average calories eaten minus the energy in
+// your weekly-average weight change (about 7,700 kcal per kg of bodyweight).
+const KCAL_PER_KG = 7700;
+const MAX_LOSS = 0.01, MAX_GAIN = 0.005; // fastest healthy pace, as a share of bodyweight per week
+const ACTIVITY = {
+  sedentary: { label: "Sedentary", f: 1.2, desc: "Desk job, little or no exercise" },
+  light: { label: "Lightly active", f: 1.375, desc: "Exercise 1–3 days a week" },
+  moderate: { label: "Moderately active", f: 1.55, desc: "Exercise 3–5 days a week" },
+  very: { label: "Very active", f: 1.725, desc: "Hard training 6–7 days a week, or a physical job" },
+};
+const PLANS = {
+  cut: { label: "Fat loss", rate: -0.007, protein: 2.2,
+    about: "Lose about <b>0.7% of your bodyweight a week</b>. In a study of athletes who lifted weights, this pace kept and even added muscle, while losing faster didn't. The usual range is 0.5–1% a week." },
+  recomp: { label: "Body recomposition", rate: 0, protein: 2.2,
+    about: "Eat at <b>maintenance</b> with high protein and lift weights. Your weight stays about the same while fat goes down and muscle goes up. It works best if you're new to lifting or coming back to it. There's no end date: track strength, waist size and photos rather than the scale." },
+  bulk: { label: "Lean bulk", rate: 0.003, protein: 1.8,
+    about: "Gain about <b>0.3% of your bodyweight a week</b> with a small surplus. Research on lifters suggests 0.25–0.5% a week for beginners and intermediates, and slower once you've trained for years. Gaining faster mostly adds fat." },
+  custom: { label: "Custom", protein: null,
+    about: "Choose a goal weight and how long to take. The app works out the daily surplus or deficit. It won't plan faster than <b>1% of bodyweight a week</b> for loss or <b>0.5% a week</b> for gain." },
+  manual: { label: "My own numbers",
+    about: "Type your own targets. Calories always match your macros: protein and carbs have 4 kcal per gram, fat has 9. Fiber is part of carbs, as on nutrition labels, so it isn't added again." },
+};
+const macroKcal = m => Math.round(4 * (m.protein || 0) + 4 * (m.carbs || 0) + 9 * (m.fat || 0));
+const kcalFmt = n => Math.round(n).toLocaleString();
+const planType = () => (state.goals.plan && PLANS[state.goals.plan.type] ? state.goals.plan.type : "manual");
+
+// Latest weekly average (Monday–Sunday), so one heavy morning doesn't move your targets
+function currentWeight() {
+  const last = latestWeightDate();
+  if (!last) return Number((state.goals.body || {}).weight) || null;
+  const w = weekAverages().get(mondayOf(last));
+  return w ? w.avg : Number(state.weights[last]);
+}
+function formulaMaintenance(b, kg) {
+  if (!(kg > 0 && b.height > 0 && b.age > 0 && (b.sex === "m" || b.sex === "f") && ACTIVITY[b.activity])) return null;
+  return (10 * kg + 6.25 * b.height - 5 * b.age + (b.sex === "f" ? -161 : 5)) * ACTIVITY[b.activity].f;
+}
+// From your own data: the last 5 full weeks with 3+ weigh-ins, and the days you logged food in them
+function learnedMaintenance() {
+  const wk = weekAverages(), thisMon = mondayOf(todayKey()), weeks = [];
+  for (let i = 5; i >= 1; i--) {
+    const m = shiftKey(thisMon, -7 * i), w = wk.get(m);
+    if (w && w.n >= 3) weeks.push({ i, m, avg: w.avg });
+  }
+  if (weeks.length < 2) return null;
+  const n = weeks.length, mx = weeks.reduce((a, w) => a - w.i, 0) / n, my = weeks.reduce((a, w) => a + w.avg, 0) / n;
+  let sxy = 0, sxx = 0;
+  for (const w of weeks) { sxy += (-w.i - mx) * (w.avg - my); sxx += (-w.i - mx) ** 2; }
+  const slope = sxy / sxx; // kg per week
+  let days = 0, logged = 0, kcal = 0;
+  for (let d = weeks[0].m, end = shiftKey(weeks[n - 1].m, 6); d <= end; d = shiftKey(d, 1)) {
+    days++;
+    const list = state.days[d];
+    if (list && list.length) { logged++; kcal += totals(list).kcal; }
+  }
+  if (logged < 10 || logged / days < 0.7) return null; // too many unlogged days to trust
+  return { kcal: kcal / logged - (slope * KCAL_PER_KG) / 7, weeks: n, slope, intake: kcal / logged };
+}
+function maintenance(b, kg) {
+  const formula = formulaMaintenance(b, kg);
+  if (!formula) return null;
+  const learned = learnedMaintenance();
+  let use = formula, trust = 0;
+  if (learned) {
+    const lk = Math.min(formula * 1.3, Math.max(formula * 0.7, learned.kcal)); // ignore wild readings
+    trust = Math.min(1, (learned.weeks - 1) / 3); // 2 weeks of data: a third; 4 or more: all of it
+    use = formula * (1 - trust) + lk * trust;
+  }
+  return { formula, learned, use, trust };
+}
+
+// What a plan means today: daily calories, macros, pace and timeline. `d` holds body, kg, type, goal and end date.
+function planOutcome(d) {
+  const p = PLANS[d.type], kg = d.kg, b = d.body;
+  const m = maintenance(b, kg);
+  if (!m || d.type === "manual") return { m };
+  const out = { m, rate: 0, weeks: null, notes: [] };
+  const today = todayKey(), goal = d.goal;
+  if (d.type === "cut" || d.type === "bulk") {
+    out.rate = p.rate * kg;
+    if (goal != null) {
+      const togo = goal - kg;
+      if (d.type === "cut" && togo > 0.05) return { m, error: "Your goal weight is above your current weight. Choose Lean bulk, or lower the goal." };
+      if (d.type === "bulk" && togo < -0.05) return { m, error: "Your goal weight is below your current weight. Choose Fat loss, or raise the goal." };
+      if (Math.abs(togo) <= 0.05) { out.rate = 0; out.reached = true; }
+      else out.weeks = Math.log(goal / kg) / Math.log(1 + p.rate); // the weekly amount shrinks or grows with your weight
+    }
+  } else if (d.type === "custom") {
+    if (goal == null || !d.end) return { m, error: "Enter a goal weight and how long to take." };
+    const weeksLeft = Math.round((parseKey(d.end) - parseKey(today)) / 864e5) / 7;
+    const togo = goal - kg;
+    if (Math.abs(togo) <= 0.05) { out.reached = true; }
+    else if (weeksLeft <= 0) { out.ended = true; }
+    else {
+      const need = togo / weeksLeft, max = (togo < 0 ? MAX_LOSS : MAX_GAIN) * kg;
+      out.rate = Math.abs(need) > max ? Math.sign(need) * max : need;
+      out.behind = Math.abs(need) > max;
+      out.weeks = Math.abs(togo / out.rate);
+    }
+  }
+  const delta = (out.rate * KCAL_PER_KG) / 7;
+  let kcal = m.use + delta;
+  const floor = b.sex === "f" ? 1200 : 1500;
+  if (kcal < floor) { kcal = floor; out.floored = true; }
+  // Protein per kg (if BMI is over 30, per kg of a BMI-25 weight, so it stays realistic)
+  const ref = b.height && kg / (b.height / 100) ** 2 > 30 ? 25 * (b.height / 100) ** 2 : kg;
+  const perKg = p.protein ?? (out.rate < 0 ? 2.2 : out.rate > 0 ? 1.8 : 2.0);
+  out.protein = Math.round(perKg * ref);
+  out.fat = Math.round((kcal * 0.25) / 9);                       // 25% of calories
+  out.carbs = Math.max(0, Math.round((kcal - 4 * out.protein - 9 * out.fat) / 4));
+  out.fiber = Math.round((kcal / 1000) * 14);                     // 14 g per 1,000 kcal
+  out.kcal = macroKcal(out);                                      // calories always add up from the macros
+  out.delta = out.kcal - m.use;
+  return out;
+}
+// Shortest healthy time for a custom goal, in weeks
+function minWeeks(kg, goal) {
+  const togo = goal - kg;
+  return Math.abs(togo) <= 0.05 ? 0 : Math.ceil(Math.abs(togo) / ((togo < 0 ? MAX_LOSS : MAX_GAIN) * kg));
+}
+const savedPlanInput = () => {
+  const g = state.goals;
+  return { body: g.body || {}, kg: currentWeight(), type: planType(), goal: g.weightGoal ?? null, end: g.plan && g.plan.end };
+};
+// Keep the daily targets in line with the plan as your weekly average and learned maintenance change
+function applyPlan() {
+  if (planType() === "manual") return;
+  const g = state.goals, out = planOutcome(savedPlanInput());
+  if (!out.kcal) return;
+  const changed = Math.abs(out.kcal - g.kcal) >= 20 || ["protein", "carbs", "fat", "fiber"].some(k => Math.abs(out[k] - g[k]) >= 3);
+  if (!changed) return;
+  for (const n of NUTS) g[n.k] = out[n.k];
+  store.saveGoals();
+}
+const weeksText = w => (w < 1 ? "under a week" : w < 9 ? `about ${Math.round(w)} week${Math.round(w) === 1 ? "" : "s"}` : `about ${Math.round(w)} weeks (${(w / 4.345).toFixed(1).replace(/\.0$/, "")} months)`);
+const paceText = r => (Math.abs(r) < 0.005 ? "Weight stays about the same" : `${r > 0 ? "+" : "−"}${Math.abs(r).toFixed(2)} kg a week`);
+// One line for WeightLedger's Home
+function planLine() {
+  const t = planType();
+  if (t === "manual") return "";
+  const out = planOutcome(savedPlanInput());
+  if (!out.kcal) return "";
+  const eta = out.weeks ? ` · goal around ${shortDate(shiftKey(todayKey(), Math.round(out.weeks * 7)))}` : "";
+  return `${PLANS[t].label}: ${paceText(out.rate).toLowerCase()}${eta}`;
+}
+
+function planFormHTML(p) {
+  const g = state.goals, b = g.body || {}, t = planType();
+  const kg = currentWeight(), plan = g.plan || {};
+  const weeksLeft = t === "custom" && plan.end ? Math.max(1, Math.round((parseKey(plan.end) - parseKey(todayKey())) / (7 * 864e5))) : "";
+  const num = (id, label, v, attrs) => `<label class="field"><span>${label}</span><input id="${p}-${id}" type="number" inputmode="decimal" ${attrs} value="${v ?? ""}"></label>`;
+  const chip = (group, val, label, on) => `<button type="button" class="chip" data-pchip="${group}" data-val="${val}" aria-pressed="${on}">${label}</button>`;
+  return `<div class="planform" id="${p}-plan" data-sex="${b.sex || ""}" data-activity="${b.activity || ""}" data-type="${t}">
+    <div class="pgroup">
+      <h3 class="ptitle">About you</h3>
+      <div class="meals" role="group" aria-label="Sex">${chip("sex", "m", "Male", b.sex === "m")}${chip("sex", "f", "Female", b.sex === "f")}</div>
+      <div class="mgrid">
+        ${num("age", "Age", b.age, 'min="13" max="100" step="1"')}
+        ${num("height", "Height (cm)", b.height, 'min="120" max="230" step="1"')}
+        ${num("weight", "Weight (kg)", kg != null ? kgFmt(kg) : "", 'min="30" max="300" step="0.1"')}
+      </div>
+      <div class="optgrid" role="group" aria-label="Activity level">${Object.entries(ACTIVITY).map(([k, a]) =>
+        `<button type="button" class="opt" data-pchip="activity" data-val="${k}" aria-pressed="${b.activity === k}"><b>${a.label}</b><span>${a.desc}</span></button>`).join("")}</div>
+      <span class="hint">Sex and age are part of the maintenance formula (Mifflin-St Jeor). ${latestWeightDate() ? "Weight is your latest weekly average; changing it here logs today's weigh-in." : "Saving logs this as today's weigh-in."}</span>
+    </div>
+    <div class="pgroup">
+      <h3 class="ptitle">Your goal</h3>
+      <div class="meals" role="group" aria-label="Goal">${Object.entries(PLANS).map(([k, v]) => chip("type", k, v.label, k === t)).join("")}</div>
+      <p class="tipnote" id="${p}-about"></p>
+      <div class="mgrid" id="${p}-goalrow">
+        ${num("goal", `Goal weight (kg)<span id="${p}-goalopt"></span>`, g.weightGoal, 'min="30" max="300" step="0.1"')}
+        <div class="timerow" id="${p}-timerow">
+          ${num("time", "Take", weeksLeft, 'min="1" max="260" step="1" placeholder="e.g. 6"')}
+          <label class="field">&nbsp;<select id="${p}-unit"><option value="weeks">weeks</option><option value="months"${weeksLeft ? "" : " selected"}>months</option></select></label>
+        </div>
+      </div>
+      <div class="mgrid" id="${p}-manual">
+        ${NUTS.slice(1).map(n => num("m-" + n.k, `${n.label} (g)`, g[n.k], 'min="0" step="1"')).join("")}
+        ${num("m-kcal", "Calories (kcal)", macroKcal(g), 'min="0" step="10"')}
+      </div>
+    </div>
+    <div class="planout" id="${p}-out" aria-live="polite"></div>
+    <div class="msg" id="${p}-msg" role="status"></div>
+  </div>`;
+}
+function readPlanForm(p) {
+  const f = $(`${p}-plan`), val = id => ($(`${p}-${id}`) ? $(`${p}-${id}`).value.trim().replace(",", ".") : "");
+  const num = id => (val(id) === "" ? null : Number(val(id)));
+  const time = num("time"), unit = val("unit");
+  const weeks = time > 0 ? (unit === "months" ? time * 4.345 : time) : null;
+  return {
+    body: { sex: f.dataset.sex || null, age: num("age"), height: num("height"), activity: f.dataset.activity || null },
+    kg: num("weight"), type: f.dataset.type, goal: num("goal"), weeks,
+    end: weeks ? shiftKey(todayKey(), Math.round(weeks * 7)) : null,
+    manual: Object.fromEntries(["protein", "carbs", "fat", "fiber"].map(k => [k, num("m-" + k) || 0])),
+  };
+}
+// Redraw the parts of the form that depend on the choices (inputs stay as typed)
+function updatePlanForm(p) {
+  const d = readPlanForm(p), t = d.type, el = id => $(`${p}-${id}`);
+  el("about").innerHTML = PLANS[t].about;
+  el("goalrow").hidden = t === "recomp";
+  el("timerow").hidden = t !== "custom";
+  el("goalopt").textContent = t === "custom" ? "" : " · optional";
+  el("manual").hidden = t !== "manual";
+  const missing = [];
+  if (!d.body.sex) missing.push("sex");
+  if (!(d.body.age > 0)) missing.push("age");
+  if (!(d.body.height > 0)) missing.push("height");
+  if (!(d.kg > 0)) missing.push("weight");
+  if (!d.body.activity) missing.push("activity level");
+  const out = planOutcome(d), m = out.m;
+  const maintTile = m
+    ? `<div class="gtile"><span class="k">Maintenance</span><span class="v">${kcalFmt(m.use)}<small>kcal</small></span><span class="s">${m.learned
+        ? `Formula ${kcalFmt(m.formula)} · your log ${kcalFmt(m.learned.kcal)} (${m.learned.weeks} weeks)`
+        : "From the formula. Your own data takes over after a few weeks of logging."}</span></div>` : "";
+  let html = "";
+  if (!m) {
+    html = `<p class="pnote">${t === "manual" ? "Add" : "Fill in"} your ${missing.join(", ")} to see your maintenance calories${t === "manual" ? " (optional for your own numbers)" : " and daily targets"}.</p>`;
+  }
+  if (t === "manual") {
+    const mk = macroKcal(d.manual);
+    html = (m ? `<div class="pgrid">${maintTile}<div class="gtile"><span class="k">Your target</span><span class="v">${kcalFmt(mk)}<small>kcal</small></span><span class="s">${Math.abs(mk - m.use) < 25 ? "About maintenance" : `${kcalFmt(Math.abs(mk - m.use))} ${mk > m.use ? "above" : "below"} maintenance`}</span></div></div>` : html)
+      + (state.goals.plan == null && Math.abs(macroKcal(state.goals) - state.goals.kcal) > 5
+        ? `<p class="pnote warn">Your saved calorie goal (${kcalFmt(state.goals.kcal)}) didn't match your macros. Saving sets it to ${kcalFmt(mk)}, the total of your macros.</p>` : "");
+  } else if (m && out.error) {
+    html = `<div class="pgrid">${maintTile}</div><p class="pnote warn">${out.error}</p>`;
+  } else if (m) {
+    const goalTxt = d.goal != null ? `${kgFmt(d.goal)} kg` : "";
+    let time = "Ongoing", timeSub = "No goal weight set";
+    if (t === "recomp") { time = "No end date"; timeSub = "Weight stays the same"; }
+    else if (out.reached) { time = "Reached"; timeSub = `You're at ${goalTxt}`; }
+    else if (out.ended) { time = "Time's up"; timeSub = "Pick a new time or plan"; }
+    else if (out.weeks) { time = weeksText(out.weeks).replace(/^about /, "~").replace(/ \(.*\)/, ""); timeSub = `To ${goalTxt}, around ${shortDate(shiftKey(todayKey(), Math.round(out.weeks * 7)))}`; }
+    html = `<div class="pgrid">${maintTile}
+        <div class="gtile"><span class="k">Daily target</span><span class="v">${kcalFmt(out.kcal)}<small>kcal</small></span><span class="s">${Math.abs(out.delta) < 25 ? "At maintenance" : `${out.delta > 0 ? "+" : "−"}${kcalFmt(Math.abs(out.delta))} a day`} · ${paceText(out.rate).toLowerCase()}</span></div>
+        <div class="gtile"><span class="k">Time</span><span class="v">${time}</span><span class="s">${timeSub}</span></div>
+      </div>
+      <div class="pmacros"><b>Protein</b> ${out.protein} g · <b>Carbs</b> ${out.carbs} g · <b>Fat</b> ${out.fat} g · <b>Fiber</b> ${out.fiber} g</div>`;
+    const notes = [];
+    if (t === "custom" && d.goal != null && d.weeks) {
+      const min = minWeeks(d.kg, d.goal);
+      if (d.weeks < min) {
+        const safe = ((d.goal < d.kg ? MAX_LOSS : MAX_GAIN) * d.kg).toFixed(2);
+        notes.push(`<p class="pnote warn">That's faster than is healthy. The limit is ${d.goal < d.kg ? "1%" : "0.5%"} of your bodyweight a week (about ${safe} kg for you), so ${kgFmt(Math.abs(d.goal - d.kg))} kg takes at least <b>${min} weeks</b> (${(min / 4.345).toFixed(1)} months). <button type="button" class="linkbtn" data-pminweeks="${min}">Use ${min} weeks</button></p>`);
+      }
+    }
+    if (out.floored) notes.push(`<p class="pnote warn">Calories are held at ${b4floor(d.body)} kcal, the lowest that's sensible without medical supervision, so progress will be slower than planned.</p>`);
+    if (t === "cut" && out.weeks > 16) notes.push(`<p class="pnote">That's a long diet. Many coaches add a 1–2 week break at maintenance every 8–12 weeks; it makes long diets easier to stick to.</p>`);
+    if (t === "bulk" && !out.reached) notes.push(`<p class="pnote">Lifted for 2+ years? Your muscle grows more slowly, so consider a smaller target, or Custom with a slower time.</p>`);
+    html += notes.join("");
+  }
+  if (t !== "manual" && m) html += `<p class="pnote">Targets update as your weekly average changes. After 2 weeks of weigh-ins (3+ a week) and food logs, the app starts learning your real maintenance from them, and after 4 weeks it relies on your data.</p>`;
+  el("out").innerHTML = html;
+}
+const b4floor = b => (b.sex === "f" ? "1,200" : "1,500");
+function savePlan(p) {
+  const d = readPlanForm(p), t = d.type, msg = text => authMsg(`${p}-msg`, text, true), b = d.body;
+  const anyBody = b.age != null || b.height != null || b.sex || b.activity;
+  if (t !== "manual" || anyBody) {
+    if (!b.sex) return msg("Choose male or female."), false;
+    if (!(b.age >= 13 && b.age <= 100)) return msg("Enter an age between 13 and 100."), false;
+    if (!(b.height >= 120 && b.height <= 230)) return msg("Enter your height in cm, e.g. 175."), false;
+    if (!(d.kg >= 30 && d.kg <= 300)) return msg("Enter your weight in kg, e.g. 69."), false;
+    if (!b.activity) return msg("Choose an activity level."), false;
+  }
+  if (d.goal != null && !(d.goal >= 30 && d.goal <= 300)) return msg("Enter a goal weight in kg, e.g. 65."), false;
+  const out = planOutcome(d);
+  if (t === "custom") {
+    if (d.goal == null || !d.weeks) return msg("Enter a goal weight and how long to take."), false;
+    const min = minWeeks(d.kg, d.goal);
+    if (d.weeks < min) return msg(`That's too fast to be healthy. Choose at least ${min} weeks.`), false;
+  }
+  if (out.error) return msg(out.error), false;
+  if (t === "manual" && !(macroKcal(d.manual) > 0)) return msg("Enter your protein, carbs and fat."), false;
+
+  const g = state.goals;
+  // A weight typed here that differs from the latest average becomes today's weigh-in
+  if (d.kg != null) {
+    const cur = currentWeight();
+    if (cur == null || Math.abs(d.kg - cur) >= 0.05) {
+      const today = todayKey();
+      state.weights = { ...state.weights, [today]: Math.round(d.kg * 10) / 10 };
+      store.saveWeight(today);
+    }
+  }
+  if (anyBody) g.body = { ...b, weight: Math.round(d.kg * 10) / 10 };
+  if (t !== "recomp" && !setWeightGoal(d.goal ?? "")) return false;
+  if (t === "manual") {
+    delete g.plan;
+    Object.assign(g, d.manual);
+    g.kcal = macroKcal(d.manual);
+  } else {
+    g.plan = { type: t, since: todayKey(), ...(t === "custom" ? { end: d.end } : {}) };
+    const fresh = planOutcome(savedPlanInput());
+    for (const n of NUTS) g[n.k] = fresh[n.k];
+  }
+  store.saveGoals(); render();
+  return true;
+}
+// Your own numbers: changing a macro updates calories; changing calories updates carbs
+function syncManual(p, changed) {
+  const v = k => Number($(`${p}-m-${k}`).value) || 0;
+  if (changed === "kcal") $(`${p}-m-carbs`).value = Math.max(0, Math.round((v("kcal") - 4 * v("protein") - 9 * v("fat")) / 4));
+  else $(`${p}-m-kcal`).value = macroKcal({ protein: v("protein"), carbs: v("carbs"), fat: v("fat") });
+}
+document.addEventListener("click", e => {
+  const c = e.target.closest("[data-pchip]");
+  if (c) {
+    const f = c.closest(".planform"), group = c.dataset.pchip;
+    f.dataset[group] = c.dataset.val;
+    for (const x of f.querySelectorAll(`[data-pchip="${group}"]`)) x.setAttribute("aria-pressed", x === c);
+    updatePlanForm(f.id.split("-")[0]);
+    return;
+  }
+  const mw = e.target.closest("[data-pminweeks]");
+  if (mw) {
+    const p = mw.closest(".planform").id.split("-")[0];
+    $(`${p}-time`).value = mw.dataset.pminweeks; $(`${p}-unit`).value = "weeks";
+    updatePlanForm(p);
+  }
+});
+document.addEventListener("input", e => {
+  const f = e.target.closest && e.target.closest(".planform");
+  if (!f) return;
+  const p = f.id.split("-")[0], m = e.target.id.match(/-m-(\w+)$/);
+  if (m) syncManual(p, m[1]);
+  updatePlanForm(p);
+});
+document.addEventListener("change", e => {
+  const f = e.target.closest && e.target.closest(".planform");
+  if (f && e.target.tagName === "SELECT") updatePlanForm(f.id.split("-")[0]);
+});
 // Bodyweight goal: progress is measured from your latest weight when the goal is set or changed. Empty clears it.
 function setWeightGoal(rawText) {
   const raw = String(rawText || "").trim();
@@ -1952,7 +2301,7 @@ async function importBackup(file) {
   }
   if (data.goals && typeof data.goals === "object") {
     for (const n of NUTS) if (Number(data.goals[n.k]) > 0) state.goals[n.k] = Number(data.goals[n.k]);
-    for (const k of ["weightGoal", "weightStart", "weightSince", "hidden"]) if (data.goals[k] != null) state.goals[k] = data.goals[k];
+    for (const k of ["weightGoal", "weightStart", "weightSince", "hidden", "body", "plan"]) if (data.goals[k] != null) state.goals[k] = data.goals[k];
     store.saveGoals();
   }
   render();
@@ -2005,12 +2354,11 @@ function showOnboarding(step = 1) {
   if (step === 1) {
     openOverlay(`
       <span class="step">Step 1 of 2</span>
-      <h2 id="dlgTitle">Set your daily goals</h2>
-      <p>Start with these and change them any time in Settings → Goals. Calories, carbs and fat are limits; protein and fiber are targets.</p>
-      <div class="mgrid">${NUTS.map(n => `<label class="field">${n.label} (${n.unit})<input id="ob-${n.k}" type="number" min="0" step="${n.k === "kcal" ? 10 : 1}" inputmode="decimal" value="${state.goals[n.k]}"></label>`).join("")}
-        <label class="field">Bodyweight goal (kg)<input id="ob-weight" type="number" min="20" max="400" step="0.1" inputmode="decimal" placeholder="Optional" value="${state.goals.weightGoal ?? ""}"></label>
-      </div>
-      <div class="row-actions"><button class="primary" id="obNext">Save and continue</button></div>`, "ob-kcal", "onboarding");
+      <h2 id="dlgTitle">Your plan</h2>
+      <p>Tell the app about you and your goal. It works out your maintenance calories and daily targets. Change it any time in Settings → Goals.</p>
+      ${planFormHTML("ob")}
+      <div class="row-actions"><button class="primary" id="obNext">Save and continue</button></div>`, "ob-age", "onboarding");
+    updatePlanForm("ob");
     return;
   }
   openOverlay(`
@@ -2032,13 +2380,7 @@ function showOnboarding(step = 1) {
     </div>`, aiKey() ? "obSkipAi" : "obAiKey", "onboarding");
 }
 function onboardingGoals() {
-  for (const n of NUTS) {
-    const v = Number($("ob-" + n.k).value);
-    if (Number.isFinite(v) && v >= 0) state.goals[n.k] = v;
-  }
-  if (!setWeightGoal($("ob-weight").value)) return;
-  store.saveGoals(); render();
-  showOnboarding(2);
+  if (savePlan("ob")) showOnboarding(2);
 }
 function finishOnboarding() {
   ls.set(onboardedKey(), "1");
@@ -2068,7 +2410,7 @@ const TOUR = [
   { mode: "weight", tab: "whome", target: "#wChart", where: "WeightLedger · Home", title: "Trend chart", text: "Dots are your weigh-ins, lines are weekly averages, and the dashed line is your goal. Hover or tap a dot for details." },
   { mode: "weight", tab: "wlog", target: "#wForm", where: "WeightLedger · Log", title: "Morning weigh-in", text: "Weigh yourself after waking up, before eating, and log it here in kg. You can pick a past date if you forgot a day." },
   { mode: "weight", tab: "whist", target: "#wWeeks", where: "WeightLedger · History", title: "Week by week", text: "Every week's average and how much it changed from the week before." },
-  { mode: "weight", tab: "whome", target: "#modeBtn", where: "Settings", title: "Settings", text: "The gear opens Goals (daily macros and bodyweight) and Account (sign-in, Gemini key and backups). The home button there brings you back." },
+  { mode: "weight", tab: "whome", target: "#modeBtn", where: "Settings", title: "Settings", text: "The gear opens Goals (your plan: fat loss, recomposition, lean bulk or custom, with your maintenance calories and daily targets) and Account (sign-in, Gemini key and backups). The home button there brings you back." },
   { mode: "main", tab: "home", where: "Done", title: "You're ready", text: "Start by logging your next meal on the Log tab. You can replay this tour any time from Settings → Account." },
 ];
 let tourI = -1;
@@ -2292,7 +2634,7 @@ document.addEventListener("click", e => {
   if (t.id === "tourBtn") { startTour(); return; }
   const show = t.closest("[data-show]");
   if (show) { toggleShown(show.dataset.show); return; }
-  if (t.id === "setWeightGoal") { switchMode("settings", "goals").then(() => $("goal-weight") && $("goal-weight").focus()); return; }
+  if (t.id === "setWeightGoal") { switchMode("settings", "goals").then(() => $("pl-goal") && $("pl-goal").focus()); return; }
   const est = t.closest("[data-est]");
   if (est) { ls.set(EST_MODE, est.dataset.est === "list" ? "list" : null); renderEstMode(); }
   const ai = t.closest("[data-ai]");
@@ -2322,7 +2664,6 @@ $("week").addEventListener("click", e => { const b = e.target.closest("[data-day
 $("bannerSignIn").onclick = async () => { await switchMode("settings", "account"); if ($("signInEmail")) $("signInEmail").focus(); };
 $("saveGoals").onclick = saveGoals;
 $("cancelGoals").onclick = renderGoalsForm;
-$("goalsForm").addEventListener("submit", e => { e.preventDefault(); saveGoals(); });
 $("estimateBtn").onclick = estimate;
 $("foodText").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) estimate(); });
 $("searchForm").addEventListener("submit", e => { e.preventDefault(); runSearch($("searchQ").value); });
