@@ -72,6 +72,32 @@ svg.solid .cut { fill: var(--surface); }
 .morph svg.solid .cut { fill: var(--bg); }
 .modebtn { justify-self: end; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); display: grid; place-items: center; padding: 0; }
 .modebtn svg, .morph svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* Notification bell, its small window and the detail view */
+.hdr-btns { position: relative; } /* the window lines up with the right edge of the header buttons */
+#bellBtn { position: relative; }
+.badge { position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--accent-ink);
+  font-size: .68rem; font-weight: 700; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px var(--bg); }
+.notepop { position: absolute; right: 0; top: calc(100% + 8px); width: min(340px, calc(100vw - 32px)); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: 0 16px 48px rgb(0 0 0 / .3); padding: 8px; display: grid; gap: 2px; z-index: 30; animation: pop .22s cubic-bezier(.2, .8, .2, 1); }
+.notepop-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.notepop-head h3 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 1rem; }
+.notepop-head .linkbtn:disabled { color: var(--muted); cursor: default; text-decoration: none; }
+.notelist { display: grid; gap: 2px; max-height: min(60vh, 420px); overflow-y: auto; }
+.noteitem { display: grid; grid-template-columns: 10px 1fr; gap: 4px 10px; text-align: left; border: 0; background: transparent; border-radius: 10px; padding: 9px 10px; }
+.noteitem:hover { background: var(--accent-soft); }
+.noteitem .ndot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: transparent; }
+.noteitem.unread .ndot { background: var(--accent); }
+.noteitem .nt { font-size: .88rem; line-height: 1.35; color: var(--muted); }
+.noteitem.unread .nt { color: var(--ink); font-weight: 600; }
+.noteitem .nw { grid-column: 2; font-size: .75rem; color: var(--muted); }
+.notepop .empty { padding: 14px 10px; font-size: .88rem; }
+.overlay[data-kind="note"] { background: rgb(10 8 18 / .66); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.notekind { font-size: .75rem; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.notedetail { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.notedetail td { padding: 7px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.notedetail td:first-child { color: var(--muted); padding-right: 12px; }
+.notedetail td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.notedetail .was { color: var(--muted); font-size: .8rem; display: block; }
 /* The icon that flies to the middle of the screen when switching between the app and settings */
 .morph { position: fixed; z-index: 50; width: 40px; height: 40px; display: grid; place-items: center; color: var(--accent); pointer-events: none; }
 .ghost { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 14px; font-weight: 500; }
@@ -350,6 +376,10 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
     </div>
     <nav class="tabs" id="tabs" aria-label="Pages"></nav>
     <div class="hdr-btns">
+      <div class="bellwrap">
+        <button class="modebtn" id="bellBtn" aria-label="Notifications" aria-expanded="false" aria-controls="notePop"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="badge" id="bellBadge" hidden></span></button>
+        <div class="notepop" id="notePop" role="dialog" aria-label="Notifications" hidden></div>
+      </div>
       <button class="modebtn" id="ledgerBtn" aria-label="Open WeightLedger"></button>
       <button class="modebtn" id="modeBtn" aria-label="Settings"></button>
     </div>
@@ -1387,6 +1417,7 @@ function render() {
   renderRecs();
   renderMeals();
   renderNote();
+  renderBell();
 }
 
 // Rippling front for the calorie arc, drawn as if the arc ended pointing down at (112, 60);
@@ -1820,17 +1851,27 @@ function saveGoals() {
 }
 
 /* ---------- Diet plan: maintenance calories and daily targets ---------- */
-// Maintenance starts from the Mifflin-St Jeor equation times an activity factor. Once you have a few weeks of
-// weigh-ins and food logs, it moves toward what your own data shows: average calories eaten minus the energy in
-// your weekly-average weight change (about 7,700 kcal per kg of bodyweight).
-const KCAL_PER_KG = 7700;
+// Maintenance starts from the Mifflin-St Jeor equation (the most accurate resting-rate equation in Frankenfield 2005)
+// times a physical activity level from doubly-labelled-water studies (FAO/WHO/UNU 2001). Once you have a few weeks of
+// weigh-ins and food logs, it moves toward the energy-balance ("intake-balance") estimate from your own data:
+// average calories eaten minus the energy stored or released by your weight change.
 const MAX_LOSS = 0.01, MAX_GAIN = 0.005; // fastest healthy pace, as a share of bodyweight per week
 const ACTIVITY = {
-  sedentary: { label: "Sedentary", f: 1.2, desc: "Desk job, little or no exercise" },
-  light: { label: "Lightly active", f: 1.375, desc: "Exercise 1–3 days a week" },
-  moderate: { label: "Moderately active", f: 1.55, desc: "Exercise 3–5 days a week" },
-  very: { label: "Very active", f: 1.725, desc: "Hard training 6–7 days a week, or a physical job" },
+  sedentary: { label: "Sedentary", f: 1.4, desc: "Desk job, little walking, no exercise" },
+  light: { label: "Lightly active", f: 1.55, desc: "Some walking, or exercise 1–3 days a week" },
+  moderate: { label: "Moderately active", f: 1.75, desc: "Exercise 3–5 days a week" },
+  very: { label: "Very active", f: 2.0, desc: "Hard training 6–7 days a week, or a physical job" },
 };
+// kcal per kg of weight change. Lean people lose or gain a bigger share as lean tissue (Forbes: fat-free share =
+// 10.4 / (10.4 + fat mass)), which holds far fewer calories than fat (Hall 2008: 9,440 vs 1,816 kcal per kg).
+// Fat mass comes from the Deurenberg BMI equation. The flat 7,700 kcal/kg rule only fits people with 30+ kg of fat.
+function kcalPerKg(b, kg) {
+  if (!(b.height > 0 && b.age > 0 && kg > 0)) return 7700;
+  const bmi = kg / (b.height / 100) ** 2;
+  const fatPct = Math.min(60, Math.max(5, 1.2 * bmi + 0.23 * b.age - 10.8 * (b.sex === "m" ? 1 : 0) - 5.4));
+  const fat = (kg * fatPct) / 100, lean = 10.4 / (10.4 + fat);
+  return (1 - lean) * 9440 + lean * 1816;
+}
 const PLANS = {
   cut: { label: "Fat loss", rate: -0.007, protein: 2.2,
     about: "Lose about <b>0.7% of your bodyweight a week</b>. In a study of athletes who lifted weights, this pace kept and even added muscle, while losing faster didn't. The usual range is 0.5–1% a week." },
@@ -1858,11 +1899,15 @@ function formulaMaintenance(b, kg) {
   if (!(kg > 0 && b.height > 0 && b.age > 0 && (b.sex === "m" || b.sex === "f") && ACTIVITY[b.activity])) return null;
   return (10 * kg + 6.25 * b.height - 5 * b.age + (b.sex === "f" ? -161 : 5)) * ACTIVITY[b.activity].f;
 }
-// From your own data: the last 5 full weeks with 3+ weigh-ins, and the days you logged food in them
-function learnedMaintenance() {
+// From your own data: the last 5 full weeks with 3+ weigh-ins, and the days you logged food in them.
+// Weeks that touch the first 7 days of a new plan are skipped: changing how much you eat shifts water and
+// glycogen for a week or so, which moves the scale without any change in fat or muscle.
+function learnedMaintenance(b, kg) {
   const wk = weekAverages(), thisMon = mondayOf(todayKey()), weeks = [];
+  const since = state.goals.plan && state.goals.plan.since, settled = since ? shiftKey(since, 7) : null;
   for (let i = 5; i >= 1; i--) {
     const m = shiftKey(thisMon, -7 * i), w = wk.get(m);
+    if (since && shiftKey(m, 6) >= since && m < settled) continue;
     if (w && w.n >= 3) weeks.push({ i, m, avg: w.avg });
   }
   if (weeks.length < 2) return null;
@@ -1877,12 +1922,12 @@ function learnedMaintenance() {
     if (list && list.length) { logged++; kcal += totals(list).kcal; }
   }
   if (logged < 10 || logged / days < 0.7) return null; // too many unlogged days to trust
-  return { kcal: kcal / logged - (slope * KCAL_PER_KG) / 7, weeks: n, slope, intake: kcal / logged };
+  return { kcal: kcal / logged - (slope * kcalPerKg(b, kg)) / 7, weeks: n, slope, intake: kcal / logged };
 }
 function maintenance(b, kg) {
   const formula = formulaMaintenance(b, kg);
   if (!formula) return null;
-  const learned = learnedMaintenance();
+  const learned = learnedMaintenance(b, kg);
   let use = formula, trust = 0;
   if (learned) {
     const lk = Math.min(formula * 1.3, Math.max(formula * 0.7, learned.kcal)); // ignore wild readings
@@ -1921,7 +1966,7 @@ function planOutcome(d) {
       out.weeks = Math.abs(togo / out.rate);
     }
   }
-  const delta = (out.rate * KCAL_PER_KG) / 7;
+  const delta = (out.rate * kcalPerKg(b, kg)) / 7;
   let kcal = m.use + delta;
   const floor = b.sex === "f" ? 1200 : 1500;
   if (kcal < floor) { kcal = floor; out.floored = true; }
@@ -1948,13 +1993,122 @@ const savedPlanInput = () => {
 // Keep the daily targets in line with the plan as your weekly average and learned maintenance change
 function applyPlan() {
   if (planType() === "manual") return;
-  const g = state.goals, out = planOutcome(savedPlanInput());
+  const g = state.goals, input = savedPlanInput(), out = planOutcome(input);
   if (!out.kcal) return;
+  let save = false;
+  if (out.reached && g.weightGoal != null && !g.plan.reached) { // once per plan
+    g.plan.reached = true; save = true;
+    notify({ kind: "goal", title: `You reached your goal weight of ${kgFmt(g.weightGoal)} kg`,
+      text: "Your weekly average hit your goal, so your calories are now set to maintenance. Pick a new plan or goal in Settings → Goals whenever you're ready.",
+      rows: [["Weekly average", `${kgFmt(input.kg)} kg`], ["Goal", `${kgFmt(g.weightGoal)} kg`], ["Started at", g.weightStart != null ? `${kgFmt(g.weightStart)} kg` : "–"], ["Daily target now", `${kcalFmt(out.kcal)} kcal`]] });
+  }
   const changed = Math.abs(out.kcal - g.kcal) >= 20 || ["protein", "carbs", "fat", "fiber"].some(k => Math.abs(out[k] - g[k]) >= 3);
-  if (!changed) return;
-  for (const n of NUTS) g[n.k] = out[n.k];
-  store.saveGoals();
+  if (changed) {
+    const before = Object.fromEntries(NUTS.map(n => [n.k, g[n.k]]));
+    for (const n of NUTS) g[n.k] = out[n.k];
+    targetsNote(input, out, before);
+    save = true;
+  }
+  if (save) store.saveGoals();
 }
+// Explain a change of daily targets: a learned maintenance, or a new weekly average
+function targetsNote(input, out, before) {
+  const g = state.goals, m = out.m, L = m.learned, prevMaint = g.lastMaint;
+  const was = (now, old, unit) => `${now}${unit}${old != null && old !== now ? `<span class="was">was ${old}${unit}</span>` : ""}`;
+  const rows = [];
+  let kind, title, text;
+  if (L && m.trust > 0 && (prevMaint == null || Math.abs(m.use - prevMaint) >= 20)) {
+    kind = "maintenance";
+    title = `Your maintenance was updated to ${kcalFmt(m.use)} kcal from your last ${L.weeks} weeks`;
+    const perKg = kcalPerKg(input.body, input.kg), stored = (-L.slope * perKg) / 7;
+    text = `Over your last ${L.weeks} weeks you ate ${kcalFmt(L.intake)} kcal a day on average and your weekly average ${Math.abs(L.slope) < 0.02 ? "stayed about the same" : `${L.slope < 0 ? "fell" : "rose"} ${Math.abs(L.slope).toFixed(2)} kg a week`}. ` +
+      `That means your body burns about ${kcalFmt(L.intake)} ${stored >= 0 ? "+" : "−"} ${kcalFmt(Math.abs(stored))} = ${kcalFmt(L.kcal)} kcal a day. ` +
+      (m.trust < 1 ? `With ${L.weeks} weeks of data, the app gives it ${Math.round(m.trust * 100)}% of the weight and the formula the rest.` : "With 4 or more weeks of data, the app now goes by your data alone.");
+    rows.push(["Maintenance", was(kcalFmt(m.use), prevMaint != null ? kcalFmt(prevMaint) : null, " kcal")],
+      ["From the formula", `${kcalFmt(m.formula)} kcal`], [`From your log (${L.weeks} weeks)`, `${kcalFmt(L.kcal)} kcal`],
+      ["Average eaten", `${kcalFmt(L.intake)} kcal a day`], ["Weekly weight change", `${L.slope >= 0 ? "+" : "−"}${Math.abs(L.slope).toFixed(2)} kg`],
+      ["Energy per kg of weight", `${kcalFmt(perKg)} kcal`]);
+  } else {
+    kind = "targets";
+    title = `Your daily target is now ${kcalFmt(out.kcal)} kcal`;
+    text = `Your weekly average is now ${kgFmt(input.kg)} kg, and your ${PLANS[input.type].label.toLowerCase()} plan's pace and protein depend on your weight, so your targets were adjusted.`;
+    rows.push(["Weekly average", `${kgFmt(input.kg)} kg`], ["Maintenance", `${kcalFmt(m.use)} kcal`]);
+  }
+  g.lastMaint = Math.round(m.use);
+  rows.push(["Pace", paceText(out.rate)], ["Daily target", was(kcalFmt(out.kcal), kcalFmt(before.kcal), " kcal")],
+    ...["protein", "carbs", "fat", "fiber"].map(k => [NUTS.find(n => n.k === k).label, was(out[k], before[k], " g")]));
+  notify({ kind, title, text, rows });
+}
+
+/* ---------- Notifications (saved with your goals, so they sync) ---------- */
+const NOTE_KINDS = { maintenance: "Maintenance update", targets: "Targets updated", goal: "Goal reached" };
+function notify(n) {
+  const g = state.goals;
+  g.notes = [{ id: uid(), at: new Date().toISOString(), read: false, ...n }, ...(g.notes || [])].slice(0, 30);
+  renderBell();
+  toast(n.title);
+}
+const unreadNotes = () => (state.goals.notes || []).filter(n => !n.read).length;
+function agoText(iso) {
+  const s = (Date.now() - new Date(iso)) / 1000;
+  if (s < 60) return "Just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  if (s < 7 * 86400) return `${Math.floor(s / 86400)} day${s < 2 * 86400 ? "" : "s"} ago`;
+  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+function renderBell() {
+  const n = unreadNotes(), badge = $("bellBadge");
+  badge.hidden = !n;
+  badge.textContent = n > 9 ? "9+" : n;
+  $("bellBtn").setAttribute("aria-label", n ? `Notifications, ${n} unread` : "Notifications");
+  if (!$("notePop").hidden) renderNotePop();
+}
+function renderNotePop() {
+  const notes = state.goals.notes || [];
+  $("notePop").innerHTML = `<div class="notepop-head"><h3>Notifications</h3><button class="linkbtn" id="notesRead"${unreadNotes() ? "" : " disabled"}>Mark all as read</button></div>
+    <div class="notelist">${notes.length ? notes.map(n => `<button class="noteitem${n.read ? "" : " unread"}" data-note="${n.id}"><span class="ndot"></span><span class="nt">${esc(n.title)}</span><span class="nw">${NOTE_KINDS[n.kind] || "Update"} · ${agoText(n.at)}</span></button>`).join("")
+      : `<div class="empty">Nothing yet. You'll get a notification here when your maintenance or daily targets change, or when you reach your goal.</div>`}</div>`;
+}
+function toggleNotePop(open = $("notePop").hidden) {
+  $("notePop").hidden = !open;
+  $("bellBtn").setAttribute("aria-expanded", open);
+  if (open) renderNotePop();
+}
+function markAllRead() {
+  for (const n of state.goals.notes || []) n.read = true;
+  store.saveGoals(); renderBell();
+}
+// One notification in the middle of a dimmed screen
+function openNote(id) {
+  const n = (state.goals.notes || []).find(x => x.id === id);
+  if (!n) return;
+  if (!n.read) { n.read = true; store.saveGoals(); renderBell(); }
+  openOverlay(`
+    <span class="notekind">${NOTE_KINDS[n.kind] || "Update"} · ${new Date(n.at).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>
+    <h2 id="dlgTitle" style="font-size:1.35rem">${esc(n.title)}</h2>
+    ${n.text ? `<p>${esc(n.text)}</p>` : ""}
+    ${n.rows && n.rows.length ? `<table class="notedetail"><tbody>${n.rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join("")}</tbody></table>` : ""}
+    <div class="row-actions" style="justify-content:space-between">
+      <button class="linkbtn" id="noteToPlan">Open my plan</button>
+      <button class="primary" id="noteClose">Close</button>
+    </div>`, "noteClose", "note");
+}
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("#bellBtn")) { toggleNotePop(); return; }
+  if (t.id === "notesRead") { markAllRead(); return; }
+  const item = t.closest("[data-note]");
+  if (item) { openNote(item.dataset.note); return; }
+  if (t.id === "noteClose" || (t.id === "overlay" && $("overlay").dataset.kind === "note")) { closeOverlay(); return; }
+  if (t.id === "noteToPlan") { closeOverlay(); toggleNotePop(false); switchMode("settings", "goals"); return; }
+  if (!$("notePop").hidden && !t.closest("#notePop") && !t.closest("#overlay")) toggleNotePop(false); // click outside closes it
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if ($("overlay").dataset.kind === "note") closeOverlay();
+  else if (!$("notePop").hidden) { toggleNotePop(false); $("bellBtn").focus(); }
+});
 const weeksText = w => (w < 1 ? "under a week" : w < 9 ? `about ${Math.round(w)} week${Math.round(w) === 1 ? "" : "s"}` : `about ${Math.round(w)} weeks (${(w / 4.345).toFixed(1).replace(/\.0$/, "")} months)`);
 const paceText = r => (Math.abs(r) < 0.005 ? "Weight stays about the same" : `${r > 0 ? "+" : "−"}${Math.abs(r).toFixed(2)} kg a week`);
 // One line for WeightLedger's Home
@@ -2073,7 +2227,7 @@ function updatePlanForm(p) {
     if (t === "bulk" && !out.reached) notes.push(`<p class="pnote">Lifted for 2+ years? Your muscle grows more slowly, so consider a smaller target, or Custom with a slower time.</p>`);
     html += notes.join("");
   }
-  if (t !== "manual" && m) html += `<p class="pnote">Targets update as your weekly average changes. After 2 weeks of weigh-ins (3+ a week) and food logs, the app starts learning your real maintenance from them, and after 4 weeks it relies on your data.</p>`;
+  if (t !== "manual" && m) html += `<p class="pnote">Targets update as your weekly average changes. After 2 weeks of weigh-ins (3+ a week) and food logs, the app starts learning your real maintenance from them, and after 4 weeks it relies on your data. The first week of a new plan is skipped while water weight settles.</p>`;
   el("out").innerHTML = html;
 }
 const b4floor = b => (b.sex === "f" ? "1,200" : "1,500");
@@ -2114,9 +2268,11 @@ function savePlan(p) {
     Object.assign(g, d.manual);
     g.kcal = macroKcal(d.manual);
   } else {
-    g.plan = { type: t, since: todayKey(), ...(t === "custom" ? { end: d.end } : {}) };
+    const keep = g.plan && g.plan.type === t ? g.plan.since : null; // re-saving the same plan doesn't restart it
+    g.plan = { type: t, since: keep || todayKey(), ...(t === "custom" ? { end: d.end } : {}) };
     const fresh = planOutcome(savedPlanInput());
     for (const n of NUTS) g[n.k] = fresh[n.k];
+    g.lastMaint = Math.round(fresh.m.use); // later maintenance notifications compare against this
   }
   store.saveGoals(); render();
   return true;
@@ -2405,12 +2561,16 @@ const TOUR = [
   { mode: "main", tab: "history", target: ".datenav", where: "History", title: "Look back", text: "Move between days with the arrows, or tap a day in the week strip below." },
   { mode: "main", tab: "history", target: "#week", where: "History", title: "Your week at a glance", text: "Each column is a day's calories against your goal line. Tap one to open that day's meals and totals." },
   { mode: "main", tab: "home", target: "#ledgerBtn", where: "Switch ledger", title: "Track your weight", text: "This button opens WeightLedger, the bodyweight side of the app. Inside it, the same button brings you back here." },
-  { mode: "weight", tab: "whome", target: "#home-weight", where: "WeightLedger · Home", title: "Current vs goal", text: "Your latest weight, your goal and how much is left, with a progress bar. Set the goal in Settings → Goals." },
+  { mode: "main", tab: "home", target: "#bellBtn", where: "Notifications", title: "The bell", text: "When the app learns your real maintenance, adjusts your daily targets or sees you reach your goal, it tells you here. Tap a notification to see exactly what changed and why." },
+  { mode: "weight", tab: "whome", target: "#home-weight", where: "WeightLedger · Home", title: "Current vs goal", text: "Your latest weight, your goal and how much is left, with a progress bar. Underneath, your plan's weekly pace and when you should reach your goal." },
   { mode: "weight", tab: "whome", target: "#wStats", where: "WeightLedger · Home", title: "Weekly averages", text: "Daily weight jumps around. The weekly average (Monday to Sunday) and its change from last week show the real trend." },
   { mode: "weight", tab: "whome", target: "#wChart", where: "WeightLedger · Home", title: "Trend chart", text: "Dots are your weigh-ins, lines are weekly averages, and the dashed line is your goal. Hover or tap a dot for details." },
   { mode: "weight", tab: "wlog", target: "#wForm", where: "WeightLedger · Log", title: "Morning weigh-in", text: "Weigh yourself after waking up, before eating, and log it here in kg. You can pick a past date if you forgot a day." },
   { mode: "weight", tab: "whist", target: "#wWeeks", where: "WeightLedger · History", title: "Week by week", text: "Every week's average and how much it changed from the week before." },
-  { mode: "weight", tab: "whome", target: "#modeBtn", where: "Settings", title: "Settings", text: "The gear opens Goals (your plan: fat loss, recomposition, lean bulk or custom, with your maintenance calories and daily targets) and Account (sign-in, Gemini key and backups). The home button there brings you back." },
+  { mode: "weight", tab: "whome", target: "#modeBtn", where: "Settings", title: "Settings", text: "The gear opens Goals (your diet plan) and Account (sign-in, Gemini key and backups). The home button there brings you back." },
+  { mode: "settings", tab: "goals", target: "#pl-plan > .pgroup:nth-child(1)", where: "Settings · Goals", title: "About you", text: "Your sex, age, height, weight and activity level give a first estimate of your maintenance calories: what you burn in a day." },
+  { mode: "settings", tab: "goals", target: "#pl-plan > .pgroup:nth-child(2)", where: "Settings · Goals", title: "Pick a plan", text: "Fat loss, Body recomposition or Lean bulk use research-backed paces. Custom lets you pick a goal weight and a time (within healthy limits), and My own numbers lets you type your own targets." },
+  { mode: "settings", tab: "goals", target: "#pl-out", where: "Settings · Goals", title: "Your daily targets", text: "Your maintenance, daily calories and macros, and when you'll reach your goal. Calories always add up from your macros. After a few weeks of weigh-ins and food logs, the app learns your real maintenance and adjusts these by itself." },
   { mode: "main", tab: "home", where: "Done", title: "You're ready", text: "Start by logging your next meal on the Log tab. You can replay this tour any time from Settings → Account." },
 ];
 let tourI = -1;
