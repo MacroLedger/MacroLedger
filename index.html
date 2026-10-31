@@ -366,7 +366,99 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
   .fill, .ring circle { transition: none !important; }
   .water::before, .water::after, .fill.tip::before, .fill.tip::after, .ring .tipw, .page { animation: none !important; }
 }
+/* Themes (Settings → Account): a dropdown whose closed state shows the current theme */
+.themepick { border: 1px solid var(--line); border-radius: 14px; }
+.themepick > summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 8px 12px 8px 8px; cursor: pointer; border-radius: 13px; }
+.themepick > summary::-webkit-details-marker { display: none; }
+.themepick > summary .tprev { width: 76px; height: 46px; padding: 5px; flex: none; }
+.themepick > summary .tsurf { padding: 0 5px; gap: 5px; }
+.themepick > summary .tsurf svg { width: 20px; height: 20px; }
+.themepick > summary .tbars { gap: 3px; }
+.themepick > summary .tbars i { height: 3px; }
+.tcur { display: grid; flex: 1; min-width: 0; line-height: 1.3; }
+.tcur b { font-weight: 600; }
+.tcur span { font-size: .8rem; color: var(--muted); }
+.chev { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s ease; }
+.themepick[open] .chev { transform: rotate(180deg); }
+.thalf { position: absolute; inset: 9px; }
+.themepick > summary .thalf { inset: 5px; }
+.themebody { display: grid; gap: 16px; padding: 4px 12px 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+@media (hover: hover) { .themepick > summary:hover { background: var(--accent-soft); } }
+.themegroup { display: grid; gap: 8px; }
+.themegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.themecard { display: grid; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: transparent; text-align: left; }
+.themecard[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) !important; }
+.tprev { display: block; height: 78px; border-radius: 9px; padding: 9px; border: 1px solid; }
+.tsurf { display: flex; align-items: center; gap: 9px; height: 100%; border-radius: 7px; padding: 0 9px; border: 1px solid; }
+.tsurf svg { width: 30px; height: 30px; flex: none; transform: rotate(-90deg); }
+.tbars { display: grid; gap: 5px; flex: 1; }
+.tbars i { display: block; height: 5px; border-radius: 3px; }
+.tbars i b { display: block; height: 100%; border-radius: 3px; }
+.tname { font-weight: 600; font-size: .86rem; padding: 0 4px; display: flex; justify-content: space-between; gap: 6px; }
+.tname small { color: var(--muted); font-weight: 400; font-size: .74rem; }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--surface); padding: 0; box-shadow: 0 0 0 1px var(--line); }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink) !important; }
+.swatch.auto { background: conic-gradient(from 90deg, #6A3FB5, #2F62D0, #0F7C7A, #2E7D45, #A66A00, #C4551B, #B8336A, #6A3FB5); position: relative; }
+.swatch.auto::after { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: var(--surface); }
 </style>
+<script>
+/* Themes: each is a full set of colour tokens. Saved per device and applied before the page draws, so there's no flash. */
+const THEMES = [
+  { id: "system", name: "System", group: "Classic", sub: "Auto" },
+  { id: "light", name: "Light", group: "Classic", sub: "Light", t: { bg: "#F4F2F8", surface: "#FFFFFF", ink: "#1D1926", muted: "#655E72", line: "#E0DBE9", track: "#E8E4F0", accent: "#6A3FB5", "accent-ink": "#FFFFFF", "accent-soft": "#ECE4F8", kcal: "#D3602A", protein: "#2E68D1", carbs: "#B9860F", fat: "#BE4374", fiber: "#378F48", warn: "#BF3B26", good: "#2F8A4A" } },
+  { id: "dark", name: "Dark", group: "Classic", sub: "Dark", dark: true, t: { bg: "#13111A", surface: "#1C1926", ink: "#ECE8F4", muted: "#9D96AB", line: "#2E2A3A", track: "#28243A", accent: "#B59AF0", "accent-ink": "#1A1029", "accent-soft": "#2B2240", kcal: "#F08A55", protein: "#6E9CF0", carbs: "#E0B444", fat: "#E77FA6", fiber: "#6CC57C", warn: "#F27A63", good: "#6CC57C" } },
+  { id: "midnight", name: "Midnight", group: "Classic", sub: "True black", dark: true, t: { bg: "#000000", surface: "#0D0B12", ink: "#ECE8F4", muted: "#8E879C", line: "#221E2C", track: "#1A1724", accent: "#B59AF0", "accent-ink": "#140C22", "accent-soft": "#1F1830", kcal: "#F08A55", protein: "#6E9CF0", carbs: "#E0B444", fat: "#E77FA6", fiber: "#6CC57C", warn: "#F27A63", good: "#6CC57C" } },
+  { id: "minimal", name: "Minimal", group: "Minimal", sub: "Light", plain: true, t: { bg: "#FAFAFA", surface: "#FFFFFF", ink: "#111111", muted: "#6B6B6B", line: "#EAEAEA", track: "#EFEFEF", accent: "#111111", "accent-ink": "#FFFFFF", "accent-soft": "#F1F1F1", kcal: "#E4572E", protein: "#3A6FD8", carbs: "#C9971C", fat: "#D1497A", fiber: "#3E9B57", warn: "#C9372C", good: "#2F8A4A" } },
+  { id: "minimal-dark", name: "Minimal Dark", group: "Minimal", sub: "Dark", dark: true, plain: true, t: { bg: "#0E0E0E", surface: "#161616", ink: "#EDEDED", muted: "#8F8F8F", line: "#262626", track: "#222222", accent: "#EDEDED", "accent-ink": "#0E0E0E", "accent-soft": "#232323", kcal: "#F28B5B", protein: "#7AA2F0", carbs: "#E3BC57", fat: "#EC86AE", fiber: "#79C98B", warn: "#F27A63", good: "#79C98B" } },
+  { id: "mono", name: "Monochrome", group: "Minimal", sub: "Light", plain: true, t: { bg: "#F2F2F2", surface: "#FFFFFF", ink: "#0A0A0A", muted: "#707070", line: "#DCDCDC", track: "#E6E6E6", accent: "#0A0A0A", "accent-ink": "#FFFFFF", "accent-soft": "#E8E8E8", kcal: "#0A0A0A", protein: "#3A3A3A", carbs: "#8A8A8A", fat: "#5E5E5E", fiber: "#ABABAB", warn: "#0A0A0A", good: "#3A3A3A" } },
+  { id: "mono-dark", name: "Mono Dark", group: "Minimal", sub: "Dark", dark: true, plain: true, t: { bg: "#000000", surface: "#0F0F0F", ink: "#F5F5F5", muted: "#8A8A8A", line: "#262626", track: "#1E1E1E", accent: "#F5F5F5", "accent-ink": "#000000", "accent-soft": "#1E1E1E", kcal: "#F5F5F5", protein: "#D4D4D4", carbs: "#8C8C8C", fat: "#B0B0B0", fiber: "#6E6E6E", warn: "#FFFFFF", good: "#D4D4D4" } },
+  { id: "paper", name: "Paper", group: "Minimal", sub: "Warm", t: { bg: "#F4ECD8", surface: "#FBF6E9", ink: "#3B3125", muted: "#7A6A55", line: "#E4D8BE", track: "#EADFC6", accent: "#8C5A2B", "accent-ink": "#FFFFFF", "accent-soft": "#F0E2CA", kcal: "#C0622F", protein: "#3F6E8C", carbs: "#B08A2E", fat: "#A94F6A", fiber: "#5C7F3A", warn: "#B23A2A", good: "#4F7A35" } },
+  { id: "ayu-light", name: "Ayu Light", group: "Editor favourites", sub: "Light", t: { bg: "#F8F9FA", surface: "#FCFCFC", ink: "#5C6166", muted: "#8A9199", line: "#E7EAED", track: "#EEF0F2", accent: "#FA8D3E", "accent-ink": "#FFFFFF", "accent-soft": "#FEEBDD", kcal: "#F2AE49", protein: "#399EE6", carbs: "#E6BA7E", fat: "#F07171", fiber: "#86B300", warn: "#E65050", good: "#6CBF43" } },
+  { id: "ayu-mirage", name: "Ayu Mirage", group: "Editor favourites", sub: "Dusk", dark: true, t: { bg: "#1F2430", surface: "#242936", ink: "#CCCAC2", muted: "#8A919E", line: "#343B4B", track: "#2D3443", accent: "#FFCC66", "accent-ink": "#1F2430", "accent-soft": "#3A3729", kcal: "#FFA659", protein: "#73D0FF", carbs: "#DFBFFF", fat: "#F28779", fiber: "#D5FF80", warn: "#FF6666", good: "#87D96C" } },
+  { id: "ayu-dark", name: "Ayu Dark", group: "Editor favourites", sub: "Dark", dark: true, t: { bg: "#0B0E14", surface: "#0F131A", ink: "#BFBDB6", muted: "#6C7380", line: "#1E232B", track: "#1A1F27", accent: "#E6B450", "accent-ink": "#0B0E14", "accent-soft": "#2A2416", kcal: "#FF8F40", protein: "#59C2FF", carbs: "#D2A6FF", fat: "#F07178", fiber: "#AAD94C", warn: "#D95757", good: "#7FD962" } },
+  { id: "nord", name: "Nord", group: "Editor favourites", sub: "Arctic", dark: true, t: { bg: "#2E3440", surface: "#3B4252", ink: "#ECEFF4", muted: "#AEB6C4", line: "#4C566A", track: "#434C5E", accent: "#88C0D0", "accent-ink": "#2E3440", "accent-soft": "#41505F", kcal: "#D08770", protein: "#81A1C1", carbs: "#EBCB8B", fat: "#B48EAD", fiber: "#A3BE8C", warn: "#BF616A", good: "#A3BE8C" } },
+  { id: "rose-pine", name: "Rosé Pine", group: "Editor favourites", sub: "Dark", dark: true, t: { bg: "#191724", surface: "#1F1D2E", ink: "#E0DEF4", muted: "#908CAA", line: "#2A273F", track: "#26233A", accent: "#C4A7E7", "accent-ink": "#191724", "accent-soft": "#2D2840", kcal: "#EBBCBA", protein: "#9CCFD8", carbs: "#F6C177", fat: "#EB6F92", fiber: "#3E8FB0", warn: "#EB6F92", good: "#9CCFD8" } },
+  { id: "rose-pine-dawn", name: "Rosé Pine Dawn", group: "Editor favourites", sub: "Light", t: { bg: "#FAF4ED", surface: "#FFFAF3", ink: "#575279", muted: "#797593", line: "#EDE4DA", track: "#F2E9E1", accent: "#907AA9", "accent-ink": "#FFFFFF", "accent-soft": "#EFE6EF", kcal: "#D7827E", protein: "#56949F", carbs: "#EA9D34", fat: "#B4637A", fiber: "#286983", warn: "#B4637A", good: "#286983" } },
+  { id: "latte", name: "Catppuccin Latte", group: "Editor favourites", sub: "Light", t: { bg: "#E6E9EF", surface: "#EFF1F5", ink: "#4C4F69", muted: "#6C6F85", line: "#CCD0DA", track: "#DCE0E8", accent: "#8839EF", "accent-ink": "#FFFFFF", "accent-soft": "#E3D8F7", kcal: "#FE640B", protein: "#1E66F5", carbs: "#DF8E1D", fat: "#EA76CB", fiber: "#40A02B", warn: "#D20F39", good: "#40A02B" } },
+  { id: "mocha", name: "Catppuccin Mocha", group: "Editor favourites", sub: "Dark", dark: true, t: { bg: "#181825", surface: "#1E1E2E", ink: "#CDD6F4", muted: "#A6ADC8", line: "#313244", track: "#313244", accent: "#CBA6F7", "accent-ink": "#1E1E2E", "accent-soft": "#2E2A40", kcal: "#FAB387", protein: "#89B4FA", carbs: "#F9E2AF", fat: "#F5C2E7", fiber: "#A6E3A1", warn: "#F38BA8", good: "#A6E3A1" } },
+  { id: "gruvbox", name: "Gruvbox", group: "Editor favourites", sub: "Retro", dark: true, t: { bg: "#282828", surface: "#32302F", ink: "#EBDBB2", muted: "#A89984", line: "#45403D", track: "#3C3836", accent: "#FABD2F", "accent-ink": "#282828", "accent-soft": "#3F3A2A", kcal: "#FE8019", protein: "#83A598", carbs: "#D3869B", fat: "#FB4934", fiber: "#B8BB26", warn: "#FB4934", good: "#B8BB26" } },
+];
+// Accent colours that work with any theme: a deeper shade on light themes, a lighter one on dark themes
+const ACCENTS = [
+  { id: "purple", name: "Purple", light: "#6A3FB5", dark: "#B59AF0" },
+  { id: "blue", name: "Blue", light: "#2F62D0", dark: "#7FA7F5" },
+  { id: "teal", name: "Teal", light: "#0F7C7A", dark: "#5CC8C2" },
+  { id: "green", name: "Green", light: "#2E7D45", dark: "#74C98A" },
+  { id: "amber", name: "Amber", light: "#A66A00", dark: "#F0B94A" },
+  { id: "orange", name: "Orange", light: "#C4551B", dark: "#F48C55" },
+  { id: "pink", name: "Pink", light: "#B8336A", dark: "#F08AB4" },
+  { id: "red", name: "Red", light: "#B83227", dark: "#F27A6E" },
+];
+const THEME_KEY = "macro-ledger-theme", ACCENT_KEY = "macro-ledger-accent";
+function themePref(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch { return fallback; } }
+function resolveTheme(id) {
+  if (id === "system" || !THEMES.some(t => t.id === id)) id = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return THEMES.find(t => t.id === id);
+}
+function applyTheme() {
+  const th = resolveTheme(themePref(THEME_KEY, "system")), acc = ACCENTS.find(a => a.id === themePref(ACCENT_KEY, ""));
+  const root = document.documentElement, tok = { ...th.t };
+  if (acc) {
+    tok.accent = th.dark ? acc.dark : acc.light;
+    tok["accent-ink"] = th.dark ? th.t.bg : "#FFFFFF";
+    tok["accent-soft"] = `color-mix(in srgb, ${tok.accent} ${th.dark ? 18 : 13}%, ${th.t.surface})`;
+  }
+  for (const [k, v] of Object.entries(tok)) root.style.setProperty("--" + k, v);
+  root.style.setProperty("--f-display", th.plain ? 'var(--f-body)' : '"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif');
+  root.style.colorScheme = th.dark ? "dark" : "light";
+  root.dataset.scheme = th.dark ? "dark" : "light";
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = th.t.bg;
+}
+applyTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (themePref(THEME_KEY, "system") === "system") applyTheme(); });
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -416,6 +508,7 @@ footer { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
   <!-- SETTINGS: account -->
   <div class="page" id="page-account" hidden>
     <div class="page-head"><div><h2 class="page-title">Account</h2><div class="hint">Sign-in, syncing and backups</div></div></div>
+    <section class="card" id="themes" aria-label="Theme"></section>
     <section class="card" id="account" aria-label="Account and backup"></section>
   </div>
 
@@ -2365,6 +2458,52 @@ function renderAccount() {
     .then(() => { if ($("aiModelSel")) $("aiModelSel").innerHTML = modelOptions(); })
     .catch(() => {});
 }
+/* ---------- Themes ---------- */
+// Each card is a tiny copy of Home in that theme's own colours: a calorie ring and three macro bars
+function themePreview(th) {
+  const card = (t, clip = "") => `<span class="tsurf" style="background:${t.surface};border-color:${t.line}${clip}">
+      <svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14" fill="none" stroke="${t.track}" stroke-width="5"/><circle cx="18" cy="18" r="14" fill="none" stroke="${t.accent}" stroke-width="5" stroke-linecap="round" stroke-dasharray="58 88"/></svg>
+      <span class="tbars">${[["protein", 78], ["carbs", 55], ["fat", 35]].map(([k, w]) => `<i style="background:${t.track}"><b style="width:${w}%;background:${t[k]}"></b></i>`).join("")}</span></span>`;
+  if (th.id !== "system") return `<span class="tprev" style="background:${th.t.bg};border-color:${th.t.line}">${card(th.t)}</span>`;
+  const L = THEMES.find(t => t.id === "light").t, D = THEMES.find(t => t.id === "dark").t; // half light, half dark
+  return `<span class="tprev" style="background:linear-gradient(135deg, ${L.bg} 50%, ${D.bg} 50%);border-color:${L.line};position:relative">
+    <span class="thalf" style="clip-path:polygon(0 0,100% 0,0 100%)">${card(L)}</span>
+    <span class="thalf" style="clip-path:polygon(100% 0,100% 100%,0 100%)">${card(D)}</span></span>`;
+}
+let themesOpen = false; // the dropdown stays open while you try themes
+function renderThemes() {
+  const cur = themePref(THEME_KEY, "system"), acc = themePref(ACCENT_KEY, ""), dark = resolveTheme(cur).dark;
+  const groups = [...new Set(THEMES.map(t => t.group))];
+  const curTheme = THEMES.find(t => t.id === cur) || THEMES[0], curAcc = ACCENTS.find(a => a.id === acc);
+  $("themes").innerHTML = `<div class="sect-head"><h2 class="sect-title">Theme</h2><span class="hint">Saved on this device, so each device can have its own look.</span></div>
+    <details class="themepick" id="themePick"${themesOpen ? " open" : ""}>
+    <summary aria-label="Theme: ${curTheme.name}. Tap to change">${themePreview(curTheme)}
+      <span class="tcur"><b>${curTheme.name}</b><span>${curTheme.sub} · ${curAcc ? curAcc.name + " accent" : "Theme's own accent"}</span></span>
+      <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></summary>
+    <div class="themebody">
+    ${groups.map(g => `<div class="themegroup"><h3 class="ptitle">${g}</h3><div class="themegrid">${THEMES.filter(t => t.group === g).map(t =>
+      `<button type="button" class="themecard" data-theme="${t.id}" aria-pressed="${t.id === cur}" aria-label="${t.name} theme">${themePreview(t)}<span class="tname">${t.name}<small>${t.sub}</small></span></button>`).join("")}</div></div>`).join("")}
+    <div class="themegroup"><h3 class="ptitle">Accent colour</h3>
+      <div class="swatches" role="group" aria-label="Accent colour">
+        <button type="button" class="swatch auto" data-accent="" aria-pressed="${!acc}" title="Theme's own colour" aria-label="Theme's own colour"></button>
+        ${ACCENTS.map(a => `<button type="button" class="swatch" data-accent="${a.id}" aria-pressed="${a.id === acc}" title="${a.name}" aria-label="${a.name}" style="background:${dark ? a.dark : a.light}"></button>`).join("")}
+      </div>
+      <span class="hint">Colours buttons, tabs and the calorie ring. The first one keeps the theme's own colour.</span>
+    </div></div></details>`;
+  $("themePick").addEventListener("toggle", e => { themesOpen = e.target.open; });
+}
+function setTheme(key, val) {
+  try { val ? localStorage.setItem(key, val) : localStorage.removeItem(key); } catch {}
+  applyTheme(); renderThemes();
+  if (state.wpage === "whome") renderWeightChart();
+}
+document.addEventListener("click", e => {
+  const th = e.target.closest("[data-theme]");
+  if (th) { setTheme(THEME_KEY, th.dataset.theme === "system" ? null : th.dataset.theme); return; }
+  const ac = e.target.closest("[data-accent]");
+  if (ac) setTheme(ACCENT_KEY, ac.dataset.accent || null);
+});
+
 function authMsg(id, text, err) { const m = $(id); m.textContent = text; m.classList.toggle("err", !!err); }
 function authError(error) {
   const m = String(error.message || "");
@@ -2719,7 +2858,7 @@ function switchTab(next, animate = true) {
 const go = (page, animate = true) => switchTab(page, animate);
 
 function applyMode(to, tab) {
-  if (to === "settings") { state.backMode = state.mode; state.setTab = tab || "goals"; renderGoalsForm(); renderAccount(); }
+  if (to === "settings") { state.backMode = state.mode; state.setTab = tab || "goals"; renderGoalsForm(); renderAccount(); renderThemes(); }
   else if (to === "weight") state.wpage = tab || "whome"; // each ledger opens on its Home
   else state.page = tab || "home";
   state.mode = to;
