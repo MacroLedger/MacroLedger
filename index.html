@@ -808,7 +808,7 @@ const FOODS = [
   [["egg curry","anda curry"],"1 egg with gravy (100 g)",100,109,6.8,3.5,7.5,0.8,0],
   [["veg kofta","kofta curry","lauki kofta"],"1 kofta with gravy (100 g)",100,101,2.5,8,6.5,1.5,0],
   [["chicken butter masala"],"1 serving (150 ml, about 4 pieces)",150,185,19,7,9,1,0],
-  [["soya chunks dry","dry soya chunks","soya chunks sabzi","soya chunk sabzi","soya sabzi"],"1 serving (150 ml, 100 g)",100,143,13.3,10.8,5.2,3.3,0],
+  [["soya chunks","soy chunks","soya chunks dry","dry soya chunks","soya chunks sabzi","soya chunk sabzi","soya sabzi"],"1 serving (150 ml, 100 g)",100,143,13.3,10.8,5.2,3.3,0],
   [["aloo bhujia","aloo ki bhujia"],"1 serving (150 ml, 100 g)",100,109,1.7,14.2,5.1,1.7,0],
   [["cabbage aloo","aloo cabbage","patta gobi aloo","bandh gobi aloo"],"1 serving (150 ml, 100 g)",100,88,1.7,8.7,5.1,2.3,0],
   [["gobi aloo","gobhi aloo","aloo gobi","aloo gobhi"],"1 serving (150 ml, 100 g)",100,90,2.2,8.8,5.1,2.5,0],
@@ -832,7 +832,7 @@ const FOODS = [
   [["red chutney","lal chutney","tomato chutney"],"1 tbsp (15 g)",15,20,0.3,2.5,1,0.4,0],
   [["imli chutney","saunth chutney","saunth","meethi chutney","tamarind chutney"],"1 tbsp (20 g)",20,41,0.2,10,0,0.3,0],
   [["fried chilli","fried chili","fried mirch","tali mirch"],"1 (8 g)",8,12,0.1,0.6,1,0.2,0],
-  [["sewai","sevai","seviyan","sevaiyan","vermicelli kheer"],"1 serving (150 ml)",150,208,6.1,29.5,7.3,0.5,0],
+  [["sewai","sevai","seviyan","sevaiyan","vermicelli kheer","semiya payasam","semiya kheer"],"1 serving (150 ml)",150,208,6.1,29.5,7.3,0.5,0],
   [["kalakand"],"1 piece (40 g)",40,146,4,18,6.4,0,0],
   [["milk cake"],"1 piece (40 g)",40,162,3.2,21,7.2,0,0],
   // Breads and grains
@@ -886,7 +886,7 @@ const FOODS = [
   [["pav bhaji"],"1 plate (2 pav + bhaji)",400,600,14,75,27,9,4],
   [["samosa"],"1 (80 g)",80,260,4,30,14,2.5,0],
   [["kachori"],"1 (60 g)",60,280,5,26,18,2,0],
-  [["pakora","pakoda","bhajji","bhajiya"],"100 g",100,290,7,28,17,4,0],
+  [["pakora","pakoda","bhajiya"],"100 g",100,290,7,28,17,4,0],
   [["bhel puri","bhel"],"1 plate (150 g)",150,250,6,40,8,4,3],
   [["pani puri","golgappa","gol gappa","puchka"],"1 piece (17 g)",17,37,0.7,5.7,1.3,0.5,0],
   [["sev puri"],"6 pieces",120,300,6,36,15,3,4],
@@ -907,6 +907,68 @@ const FOODS = [
   [["popcorn"],"3 cups (24 g)",24,93,3,19,1.1,3.6,0],
   [["nachos"],"1 serving with cheese (100 g)",100,346,9,36,19,3,1],
   [["french fries","fries"],"medium (117 g)",117,365,4,48,17,4.4,0],
+  // More North Indian home dishes (home-kitchen rule: about 5 g oil or ghee per katori or paratha)
+  [["missi roti"],"1 (50 g)",50,146,5.7,23.1,3.4,3.7,0],
+  [["makki ki roti","makki roti","makke di roti"],"1 (60 g)",60,184,3.7,30,5.5,2.9,0],
+  [["bajra roti","bajre ki roti","bajra rotla"],"1 (50 g)",50,142,4.1,23,3.7,4,0],
+  [["jowar roti","jowar bhakri","bhakri"],"1 (50 g)",50,126,3.7,25,1.2,3.4,0],
+  [["paneer paratha"],"1 (120 g)",120,300,11.8,33.6,13.1,4.8,0],
+  [["methi paratha"],"1 (80 g)",80,208,5.8,33,5.9,5.5,0],
+  [["mooli paratha","muli paratha"],"1 (110 g)",110,210,5.6,33.8,5.8,5.5,0],
+  [["lachha paratha","laccha paratha"],"1 (90 g)",90,248,6,36,8.9,5.3,0],
+  [["besan chilla","besan cheela","besan ka chilla"],"1 (60 g)",60,141,6.6,17.4,5,3.2,0],
+  [["moong dal chilla","moong chilla","moong dal cheela"],"1 (60 g)",60,132,7.3,18,3.4,2.5,0],
+  [["sooji chilla","suji chilla","rava chilla"],"1 (60 g)",60,142,3.8,22.8,4,1.1,0],
+  [["urad dal","dhuli urad dal","urad dhuli dal"],"1 katori (150 g)",150,150,7.4,17.8,5.5,5.4,0],
+  [["dal palak","palak dal"],"1 katori (150 g)",150,145,7.4,16.8,5.4,3.9,0],
+  [["sabut masoor","sabut masoor dal","whole masoor dal"],"1 katori (150 g)",150,149,7.4,18,5.3,3.2,0],
+  [["sabut moong","sabut moong dal","whole moong dal","moong sabut"],"1 katori (150 g)",150,153,7.2,18.8,5.4,4.9,0],
+  [["panchmel dal","panchratna dal"],"1 katori (150 g)",150,151,7.2,18,5.6,3.5,0],
+  [["paneer do pyaza","paneer do pyaaza"],"1 katori (150 g)",150,211,10,8,15.4,1.5,0],
+  [["methi malai matar","methi matar malai"],"1 katori (150 g)",150,131,4.3,10.5,8,3.3,0],
+  [["bharwa bhindi","stuffed bhindi"],"1 katori (100 g)",100,104,3.5,10,5.6,3.5,0],
+  [["bharwa karela","stuffed karela"],"1 katori (100 g)",100,94,2,9,5.5,3,0],
+  [["gatte ki sabzi","gatte","besan gatte"],"1 katori (150 g)",150,202,8,19.3,10.3,3.5,0],
+  [["soya keema","soya mince"],"1 katori (150 g)",150,180,16.7,16.7,5.2,5.5,0],
+  [["keema matar","mutton keema","keema"],"1 katori (150 g)",150,263,21.6,8.2,16,2.5,0],
+  [["chana chaat","chole chaat"],"1 bowl (150 g)",150,181,9.3,30,2.6,7.6,0],
+  [["sprouts chaat","moong sprouts chaat"],"1 bowl (150 g)",150,59,4,10,0.3,2.5,0],
+  [["dahi bhalla","dahi vada","dahi bhalle"],"2 bhalle with dahi (150 g)",150,195,7.8,20.8,8.9,2,0],
+  [["matar pulao","peas pulao","mutter pulao"],"1 cup (200 g)",200,256,5.6,46.2,5.4,2.2,0],
+  [["cucumber raita","kheera raita","kakdi raita"],"1 katori (150 g)",150,71,3.8,6.5,3.3,0.5,0],
+  [["moong dal halwa"],"1 katori (100 g)",100,318,7,36.5,16,2,0],
+  [["rabri","rabdi"],"1 katori (100 g)",100,209,7,25,9,0,0],
+  [["phirni","firni"],"1 katori (120 g)",120,151,3.9,24.8,4,0.2,0],
+  // More South Indian home dishes
+  [["pesarattu","moong dosa"],"1 (100 g)",100,170,9.6,25,3.5,6.5,0],
+  [["set dosa"],"1 (60 g)",60,99,2.3,17.4,2.2,0.6,0],
+  [["neer dosa"],"1 (50 g)",50,79,1.4,15.6,1.2,0.3,0],
+  [["appam","palappam"],"1 (60 g)",60,99,1.6,19,1.8,0.5,0],
+  [["idiyappam","string hoppers","sevai upma"],"2 pieces (80 g)",80,110,1.8,24,0.8,0.7,0],
+  [["ven pongal","khara pongal","pongal"],"1 katori (200 g)",200,264,7.3,41.7,7.6,2,0],
+  [["sweet pongal","sakkarai pongal","chakkara pongali"],"1 katori (150 g)",150,301,4.5,56,6.5,1.5,0],
+  [["rava idli","rava idly"],"1 (50 g)",50,81,2.3,13.5,2,0.6,0],
+  [["semiya upma","vermicelli upma"],"1 plate (180 g)",180,237,6.5,40,5.7,2.5,0],
+  [["puttu"],"1 piece (100 g)",100,215,3.3,41.5,4,1.8,0],
+  [["adai","adai dosa"],"1 (100 g)",100,187,9,27,4.8,4,0],
+  [["ragi dosa","nachni dosa"],"1 (80 g)",80,117,2.2,21.6,2.4,3.4,0],
+  [["ragi mudde","ragi ball","ragi sangati"],"1 ball (150 g)",150,165,3.7,36,0.7,5.7,0],
+  [["paniyaram","kuzhi paniyaram","paddu","guntha ponganalu"],"4 pieces (100 g)",100,155,3,26,4.3,1,0],
+  [["bisi bele bath","bisibelebath"],"1 katori (200 g)",200,263,7.9,43.3,6.5,4.5,0],
+  [["puliyogare","tamarind rice","puli sadam","pulihora"],"1 serving (200 g)",200,284,5.3,47.8,7.9,1.5,0],
+  [["tomato rice","thakkali sadam"],"1 serving (200 g)",200,252,4.8,46,5.4,1.5,0],
+  [["coconut rice","thengai sadam"],"1 serving (200 g)",200,271,4.5,44.3,8.4,2,0],
+  [["rasam","saaru"],"1 katori (150 ml)",150,51,1.3,7,2,1,0],
+  [["avial","aviyal"],"1 katori (150 g)",150,146,3,12,9.5,3.3,0],
+  [["veg stew","vegetable stew","kerala stew"],"1 katori (150 g)",150,117,2.9,10.7,7,2.5,0],
+  [["poriyal","thoran","beans poriyal","cabbage poriyal","palya"],"1 katori (100 g)",100,97,1.9,7.2,6.7,2.5,0],
+  [["kootu","kootu curry"],"1 katori (150 g)",150,130,5,15,5.5,3.5,0],
+  [["more kuzhambu","mor kuzhambu","majjige huli"],"1 katori (150 g)",150,117,3.8,9,7.3,1,0],
+  [["vatha kuzhambu","kuzhambu","puli kuzhambu"],"1 katori (100 g)",100,90,1,8,6,1.5,0],
+  [["egg roast","mutta roast"],"1 egg with masala (100 g)",100,119,6.9,5.4,7.8,1,0],
+  [["podi with ghee","gunpowder","milagai podi","podi"],"1 tbsp podi + 1 tsp ghee",15,78,2,4,6,1.5,0],
+  [["masala vada","dal vada","paruppu vada"],"1 (35 g)",35,92,3.3,9,4.8,2.4,0],
+  [["rava kesari","kesari bath","kesari"],"1 katori (100 g)",100,258,2.6,43.3,8.3,0.5,0],
   // Dals, curries and vegetables
   [["dal makhani"],"1 bowl (200 g)",200,300,10,28,16,8,0],
   [["dal tadka","dal fry"],"1 katori (150 g)",150,141,7,18,4.5,3.5,0],
@@ -953,7 +1015,7 @@ const FOODS = [
   [["paneer bhurji"],"1 katori (150 g)",150,281,15,8,21,1.5,0],
   [["paneer","cottage cheese"],"100 g",100,265,18,3.5,20,0,0],
   [["tofu"],"100 g",100,144,15.6,3,8.7,2.3,0],
-  [["soya chunks","soy chunks","nutrela"],"50 g dry",50,173,26,16.5,0.3,6.5,0],
+  [["raw soya chunks","uncooked soya chunks","soya chunks raw","nutrela"],"50 g dry",50,173,26,16.5,0.3,6.5,0], // the dry packet, before cooking
   [["raita"],"1 bowl (150 g)",150,100,5,8,5,0.5,0],
   [["salad","green salad"],"1 bowl (150 g)",150,50,2,9,0.5,3,0],
   [["caesar salad"],"1 bowl",250,300,10,12,24,3,2],
@@ -1117,8 +1179,30 @@ const FOODS = [
   [["sugar","cheeni","jaggery","gur"],"1 tsp (4 g)",4,16,0,4.2,0,0,4.2],
 ];
 // Every alias, longest first, so "brown rice" wins over "rice" and "egg curry" over "egg".
+// Spelling: Indian food names are written many ways in English, so names and what you type are both reduced to
+// one spelling before matching: "poori", "puri", "bhatoora", "bhature", "dhal", "daal", "subji", "cheela", "chilla",
+// "zeera" and "idly" all line up. Doubled letters, aa/ee/oo, aspirated letters (bh, dh, kh, th…), sh, w/v, z/j and a
+// final -e (plural "bhature", "samose", "karele") are treated as the same.
+const norm = s => String(s).toLowerCase()
+  .replace(/chh/g, "ch").replace(/([bdgjkpt])h/g, "$1").replace(/sh/g, "s")
+  .replace(/w/g, "v").replace(/z/g, "j").replace(/q/g, "k")
+  .replace(/aa/g, "a").replace(/ee/g, "i").replace(/oo/g, "u").replace(/ii/g, "i")
+  .replace(/([bcdfgjklmnprstvxy])\1/g, "$1")
+  .replace(/\b(\w{3,})e\b/g, "$1a").replace(/ey\b/g, "i").replace(/(\w)y\b/g, "$1i")
+  // spellings that sound different but mean the same dish
+  .replace(/parant|parot/g, "parat").replace(/\b(dosa|vada)i\b/g, "$1").replace(/chatni/g, "chutni")
+  .replace(/\bsubj/g, "sabj").replace(/\bmuter\b/g, "matar").replace(/baigan/g, "baingan").replace(/biri?yani|biriani/g, "biryani");
+// Other names the rules above can't line up
+const MORE_NAMES = {
+  puri: ["pudi"], roti: ["rotli", "fulka"], chhole: ["choley", "cholay", "chana"], dosa: ["thosai"], "pani puri": ["panipuri"],
+  bhindi: ["lady finger", "ladyfinger", "ladies finger"], lauki: ["louki"], jalebi: ["jilebi"], poha: ["aval", "avalakki"],
+  upma: ["uppittu", "uppuma"], khichdi: ["khichri", "khichadi"], raita: ["rayta"], kachori: ["kachauri"], idiyappam: ["idiappam"],
+  puliyogare: ["puliyodharai", "puliyodarai"], "vatha kuzhambu": ["kulambu", "kuzhumbu"], pakora: ["pakodi", "bhajia"],
+  "masala chai": ["cutting chai"], "besan chilla": ["chilla", "cheela", "chila"], rajma: ["rajmah", "razma"], rasam: ["rasum", "chaaru"], kheer: ["payasa"], "boiled egg": ["anda boiled"], "chicken biryani": ["murgh biryani"],
+};
+for (const f of FOODS) for (const a of MORE_NAMES[f[0][0]] || []) if (!f[0].includes(a)) f[0].push(a);
 const ALIASES = FOODS.flatMap(f => f[0].map(a => [a, f])).sort((x, y) => y[0].length - x[0].length);
-const ALIAS_RE = new Map(ALIASES.map(([a]) => [a, new RegExp(`\\b${a}(?:s|es)?\\b`)]));
+const ALIAS_RE = new Map(ALIASES.map(([a]) => [a, new RegExp(`\\b${norm(a)}(?:s|es)?\\b`)]));
 const WORD_NUM = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, half: 0.5, quarter: 0.25 };
 const STOP = new Set("a an of the with and some my small medium large big cup cups bowl bowls katori katoris plate plates glass glasses piece pieces pcs pc slice slices tbsp tsp spoon spoons scoop scoops serving servings g gm gms gram grams ml half quarter one two three four five six full".split(" "));
 
@@ -1298,7 +1382,7 @@ const store = {
 
 /* ---------- Estimation: your log, then the built-in list ---------- */
 const tokens = s => s.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/)
-  .filter(w => w && !STOP.has(w)).map(w => w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w);
+  .filter(w => w && !STOP.has(w)).map(w => norm(w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w));
 
 function qtyOf(p) {
   const g = p.match(/(\d+(?:\.\d+)?)\s*(g|gm|gms|grams?|ml)\b/);
@@ -1339,9 +1423,11 @@ function makeItem(name, base, servings, source, note = "") {
   it.portion = portionLabel(base, s);
   return it;
 }
+// Foods you logged before, for reuse in estimates. USDA results are left out: USDA is only used when you search it.
 function historyFoods() {
   const map = new Map();
   for (const date of Object.keys(state.days).sort()) for (const e of state.days[date]) {
+    if (e.source === "USDA") continue;
     const toks = tokens(String(e.name || ""));
     if (toks.length) map.set(String(e.name).trim().toLowerCase(), { e, toks });
   }
@@ -1360,24 +1446,34 @@ function matchHistory(p, hist) {
   return best;
 }
 function matchBuiltin(p) {
-  for (const [a, f] of ALIASES) if (ALIAS_RE.get(a).test(p)) return f;
+  const np = norm(p);
+  for (const [a, f] of ALIASES) if (ALIAS_RE.get(a).test(np)) return f;
   return null;
 }
 // Plates made of parts. Each part becomes its own item with its own amount; a number typed with the plate
 // ("3 pav bhaji") counts the bread or jalebi, and the rest starts at 1 serving.
-const COMBOS = [
-  { re: /\b(?:pav|paav) bhaji\b/, parts: [["butter pav", 2, true], ["bhaji", 1]] },
-  { re: /\b(?:chhole|chole)[ -]bhatur[ae]?\b/, parts: [["chhole", 1], ["bhatura", 2, true]] },
+const COMBOS = [ // matched against the spelling-normalised text (see norm)
+  { re: /\b(?:pav|pao) baji\b/, parts: [["butter pav", 2, true], ["bhaji", 1]] },
+  { re: /\b(?:chola|chana)[ -]batura\b/, parts: [["chhole", 1], ["bhatura", 2, true]] },
   { re: /\bpoha[ -]jalebi\b/, parts: [["poha", 1], ["jalebi", 2, true]] },
 ];
 function comboItems(p) {
-  const c = COMBOS.find(x => x.re.test(p));
+  const c = COMBOS.find(x => x.re.test(norm(p)));
   if (!c) return null;
   const q = qtyOf(p);
   return c.parts.map(([alias, n, counted]) => {
     const f = ALIASES.find(([a]) => a === alias)[1];
     return builtinItem(f, counted ? p : "", counted && q && q.n ? q.n : n);
   });
+}
+// AI mode: a part that is only a built-in food plus an amount or size ("2 roti", "dal", "large bhatura x 3") uses the
+// list's numbers; anything more descriptive ("pizza with a bit of chicken") still goes to Gemini.
+const PLAIN_EXTRA = new Set(["x", "sized", "size", "regular", "normal", "mini", "little", "jumbo"]);
+function plainBuiltin(p) {
+  const f = matchBuiltin(p);
+  if (!f) return null;
+  const alias = ALIASES.find(([a, ff]) => ff === f && ALIAS_RE.get(a).test(norm(p)))[0], own = new Set(tokens(alias));
+  return tokens(p).every(t => own.has(t) || PLAIN_EXTRA.has(t)) ? f : null;
 }
 const splitParts = text =>text.toLowerCase().split(/,|;|\n|\+|&|\band\b|\bwith\b|\bin\b/).map(s => s.trim()).filter(Boolean);
 function localEstimate(text) {
@@ -1389,8 +1485,9 @@ function localEstimate(text) {
     const combo = comboItems(p);
     if (combo) { items.push(...combo); continue; }
     const q = qtyOf(p), hm = matchHistory(p, hist), bf = matchBuiltin(p);
-    // Foods first logged from the built-in list come from the list again (current values, true medium size)
-    if (hm && (hm.strong || !bf) && !(bf && hm.h.e.source === "Built-in list")) {
+    // When the built-in list knows the food, it wins over copies in your log (USDA, Open Food Facts or AI numbers
+    // logged earlier); only foods you typed the numbers for yourself beat it. Save favourites in My foods instead.
+    if (hm && (hm.strong || !bf) && (!bf || hm.h.e.source === "Entered by you")) {
       const e = hm.h.e, med = baseOf(e), bread = BREADS.has(String(e.name).toLowerCase());
       const size = bread && !(q && q.grams != null) ? sizeWord(p) : "medium", base = scaleBase(med, size);
       const it = makeItem(e.name, base, servingsFor(q, base, e.base ? (e.servings || 1) : 1), "From your log");
@@ -1430,7 +1527,9 @@ function sizedBase(base, p, small = 0.75, large = 1.3) {
 }
 // Breads get Small / Medium / Large buttons in the estimate; medium is the list's usual size
 const BREADS = new Set(["roti", "tandoori roti", "naan", "butter naan", "paratha", "aloo paratha", "stuffed paratha", "thepla", "puri", "bhatura",
-  "pav", "butter pav", "bread", "brown bread", "dosa", "masala dosa", "rava dosa", "stuffed dosa", "uttapam"]);
+  "pav", "butter pav", "bread", "brown bread", "dosa", "masala dosa", "rava dosa", "stuffed dosa", "uttapam",
+  "missi roti", "makki ki roti", "bajra roti", "jowar roti", "paneer paratha", "methi paratha", "mooli paratha", "lachha paratha",
+  "besan chilla", "moong dal chilla", "sooji chilla", "pesarattu", "set dosa", "neer dosa", "appam", "adai", "ragi dosa"]);
 function builtinItem(f, p, count) {
   const med = builtinBase(f), q = qtyOf(p), size = q && q.grams != null ? "medium" : sizeWord(p), base = scaleBase(med, size);
   const it = makeItem(cap(f[0][0]), base, count ?? servingsFor(q, base, 1), "Built-in list");
@@ -1644,11 +1743,21 @@ async function aiEstimate(text, onModel = () => {}) {
   return { items, model: used, fellBack: used !== first };
 }
 async function estimateAI(text) {
-  // Anything that matches My foods or a mess plate (pav bhaji…) uses those numbers; only the rest goes to Gemini
-  const parts = splitParts(text), mine = [], rest = [];
-  for (const p of parts) {
-    const f = myFoodMatch(p), combo = !f && comboItems(p);
-    if (f) mine.push(myFoodItem(p, f)); else if (combo) mine.push(...combo); else rest.push(p);
+  // My foods, mess plates (pav bhaji…) and plain built-in foods use those numbers; only the rest goes to Gemini.
+  // A comma-separated piece is handled here only if every food in it is one of those, so a description like
+  // "small pizza with a bit of chicken" reaches Gemini whole.
+  const local = p => {
+    const f = myFoodMatch(p);
+    if (f && tokens(p).every(t => PLAIN_EXTRA.has(t) || [f.name, ...(f.aliases || [])].some(n => tokens(n).includes(t)))) return [myFoodItem(p, f)];
+    const combo = comboItems(p);
+    if (combo) return combo;
+    const bf = plainBuiltin(p);
+    return bf ? [builtinItem(bf, p)] : null;
+  };
+  const mine = [], rest = [];
+  for (const piece of text.split(/,|;|\n|\+/).map(s => s.trim()).filter(Boolean)) {
+    const found = splitParts(piece).map(local);
+    if (found.length && found.every(Boolean)) mine.push(...found.flat()); else rest.push(piece);
   }
   if (mine.length) {
     state.pending = [...(state.pending || []), ...mine];
@@ -2130,6 +2239,7 @@ function recommend() {
     const sameWd = i % 7 === 0, nextToWd = i % 7 === 1 || i % 7 === 6, recent = i <= 3;
     const w = (sameWd ? 3 : nextToWd || recent ? 1.5 : 0.5) * (1 - i / 80);
     for (const e of list) {
+      if (e.source === "USDA") continue; // USDA only through the search box
       const key = String(e.name).trim().toLowerCase();
       let f = foods.get(key);
       if (!f) foods.set(key, f = { e, count: 0, sameWd: 0, recent: 0, meals: {}, w: 0 }); // first hit is the most recent
@@ -3356,7 +3466,7 @@ document.addEventListener("click", e => {
   const rm = t.closest("[data-remove]");
   if (rm) { removeEntry(rm.dataset.remove, rm.dataset.date); return; }
   const sr = t.closest("[data-search]");
-  if (sr) { runSearch(sr.dataset.search); $("searchQ").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+  if (sr) { $("searchBox").open = true; $("searchQ").value = sr.dataset.search; runSearch(sr.dataset.search); $("searchQ").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
   const res = t.closest("[data-res]");
   if (res) { addResult(Number(res.dataset.res)); return; }
   if (t.id === "exportBtn") exportBackup();
