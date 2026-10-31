@@ -12,7 +12,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<!-- Security: the page may only load code from this file and jsDelivr, and only talk to the services it uses -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://generativelanguage.googleapis.com https://api.nal.usda.gov https://world.openfoodfacts.org; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<!-- integrity: the browser refuses the library if the CDN copy was ever tampered with -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <style>
 /* Layout: three pages under a sticky tab bar. Home = today's remaining + totals, Log = add food + today's meals, History = any past day. */
 :root {
@@ -196,6 +200,9 @@ textarea { width: 100%; min-height: 76px; resize: vertical; border: 1px solid va
 .linkbtn:hover { text-decoration: underline; }
 .msg { font-size: .88rem; color: var(--muted); }
 .msg.err { color: var(--warn); }
+.card.danger { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+.dangerbtn { background: var(--warn); color: #fff; border: 0; border-radius: 999px; padding: 9px 20px; font-weight: 600; }
+.dangerbtn:disabled { opacity: .45; cursor: default; }
 .tipnote { margin: 0; font-size: .82rem; color: var(--muted); background: var(--accent-soft); border-radius: 10px; padding: 8px 12px; }
 .tipnote b { color: var(--ink); font-weight: 600; }
 .missed { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -621,13 +628,14 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
     <div class="page-head"><div><h2 class="page-title">Account</h2><div class="hint">Sign-in, syncing and backups</div></div></div>
     <section class="card" id="themes" aria-label="Theme"></section>
     <section class="card" id="account" aria-label="Account and backup"></section>
+    <section class="card danger" id="dangerZone" aria-label="Delete data"></section>
   </div>
 
   <!-- HOME: what's left today and today's totals -->
   <div class="page" id="page-home">
     <div class="page-head">
       <div><h2 class="page-title">Today</h2><div class="hint" id="home-date"></div></div>
-      <button class="primary" data-go="log">Log food</button>
+      <button class="primary" data-logmeal="">Log food</button>
     </div>
     <section class="summary" aria-label="Today's remaining macros">
       <div class="ring" id="home-ring"></div>
@@ -793,7 +801,7 @@ const FOODS = [
   // Plates like pav bhaji are logged as their parts (see COMBOS), so each part's count can be set.
   [["puri","poori","ajwain puri","mess puri"],"1 (30 g)",30,109,2.4,14,4.8,2,0],
   [["bhatura","bhature","amritsari bhatura","amritsari bhature"],"1 (90 g)",90,296,6,42,11.6,1.5,0],
-  [["chhole","chole","amritsari chhole","amritsari chole","chana masala"],"1 serving (150 ml)",150,209,8.3,27.5,7.3,7.5,0],
+  [["chhole","chole","amritsari chhole","amritsari chole","chana masala","chickpea curry"],"1 serving (150 ml)",150,209,8.3,27.5,7.3,7.5,0],
   [["kaddu chola","kaddu chana"],"1 serving (150 ml)",150,150,5,18.5,6.2,4.5,0],
   [["kaddu","kaddu sabzi","pumpkin sabzi","sitaphal"],"1 serving (150 ml)",150,99,1.5,12,5,2,0],
   [["mix dal","mixed dal"],"1 serving (150 ml)",150,150,7.2,18,5.5,3.5,0],
@@ -842,19 +850,14 @@ const FOODS = [
   [["naan"],"1 (90 g)",90,262,8.7,45,5.1,1.9,1.5],
   [["aloo paratha"],"1 (120 g)",120,250,6.4,40.9,6.8,5.8,0],
   [["paratha"],"1 (80 g)",80,203,5.4,32.4,5.8,4.8,0],
-  [["puri","poori"],"1 (25 g)",25,100,1.7,11,5.5,0.7,0],
-  [["bhatura"],"1 (80 g)",80,290,6,38,13,1.5,1],
   [["thepla"],"1 (40 g)",40,108,3.3,16,3.4,2.5,0],
   [["brown rice"],"1 cup cooked (160 g)",160,216,5,45,1.8,3.5,0],
   [["jeera rice"],"1 cup (180 g)",180,234,4.6,46,3.5,0.7,0],
   [["curd rice"],"1 bowl (250 g)",250,277,7.5,46.7,6.7,1,0],
-  [["lemon rice"],"1 plate (200 g)",200,300,5,48,10,2,0],
-  [["fried rice"],"1 plate (250 g)",250,420,9,62,14,2,1],
   [["pulao","pulav","veg pulao"],"1 cup (200 g)",200,252,5.3,45,5.6,2.5,0],
   [["chicken biryani"],"1 plate (300 g)",300,458,28.9,53,14.5,1.5,0],
   [["mutton biryani"],"1 plate (300 g)",300,513,26.9,53,21.5,1.5,0],
   [["biryani","veg biryani"],"1 plate (300 g)",300,359,7.4,63,8.6,3,0],
-  [["rice","white rice","chawal"],"1 cup cooked (160 g)",160,205,4.3,45,0.4,0.6,0],
   [["khichdi"],"1 bowl (250 g)",250,230,8,38,5,4,0],
   [["poha"],"1 plate (200 g)",200,250,5,45,6,3,1],
   [["upma"],"1 plate (200 g)",200,237,5.7,39,6.5,3,0],
@@ -880,10 +883,8 @@ const FOODS = [
   [["idli"],"1 (40 g)",40,58,2,12,0.2,0.8,0],
   [["uttapam"],"1 (150 g)",150,225,6,40,4.5,3,0],
   [["medu vada"],"1 (50 g)",50,140,4,14,8,2,0],
-  [["sambar"],"1 bowl (200 g)",200,130,6,18,4,5,0],
   [["coconut chutney"],"2 tbsp (30 g)",30,70,0.8,2.5,6.5,1.5,0],
   [["vada pav"],"1",150,300,6,40,13,3,1],
-  [["pav bhaji"],"1 plate (2 pav + bhaji)",400,600,14,75,27,9,4],
   [["samosa"],"1 (80 g)",80,260,4,30,14,2.5,0],
   [["kachori"],"1 (60 g)",60,280,5,26,18,2,0],
   [["pakora","pakoda","bhajiya"],"100 g",100,290,7,28,17,4,0],
@@ -970,15 +971,9 @@ const FOODS = [
   [["masala vada","dal vada","paruppu vada"],"1 (35 g)",35,92,3.3,9,4.8,2.4,0],
   [["rava kesari","kesari bath","kesari"],"1 katori (100 g)",100,258,2.6,43.3,8.3,0.5,0],
   // Dals, curries and vegetables
-  [["dal makhani"],"1 bowl (200 g)",200,300,10,28,16,8,0],
   [["dal tadka","dal fry"],"1 katori (150 g)",150,141,7,18,4.5,3.5,0],
   [["moong dal"],"1 katori (150 g)",150,132,7.3,18,3.4,2.5,0],
   [["dal","toor dal","arhar dal","masoor dal"],"1 katori (150 g)",150,137,7.2,18,4,3.5,0],
-  [["rajma"],"1 bowl (200 g)",200,220,10,32,5,9,0],
-  [["chole","chana masala","chickpea curry"],"1 bowl (200 g)",200,260,10,35,9,9,0],
-  [["kadhi"],"1 bowl (200 g)",200,160,5,12,10,1,1],
-  [["sambhar"],"1 bowl (200 g)",200,130,6,18,4,5,0],
-  [["aloo gobi"],"1 bowl (150 g)",150,160,3.5,17,9,4,0],
   [["bhindi","bhindi masala","okra"],"1 katori (100 g)",100,87,2,8,5.2,3.3,0],
   // Home-kitchen sabzis: about 1 tsp (5 g) oil per katori, whether dry (about 100 g) or gravy (150 g); no cream or
   // butter finish, paneer dishes about 40 g paneer per katori. Restaurant versions usually have 2–3 times the fat.
@@ -1037,7 +1032,6 @@ const FOODS = [
   [["soup","veg soup"],"1 bowl (250 ml)",250,80,3,12,2.5,2.5,2],
   // Eggs, meat and fish
   [["egg white"],"1 large (33 g)",33,17,3.6,0.2,0.1,0,0],
-  [["egg curry"],"1 bowl (200 g)",200,260,14,8,19,2,0],
   [["omelette","omelet"],"2 eggs (120 g)",120,190,13,1.5,15,0.3,0],
   [["bhurji","egg bhurji","scrambled egg","scrambled eggs"],"2 eggs (120 g)",120,200,13,3,15,0.5,0],
   [["boiled egg","egg","anda"],"1 large (50 g)",50,72,6.3,0.4,4.8,0,0],
@@ -1329,6 +1323,7 @@ const store = {
       if (this.user) { // signed out: don't leave the log on a shared device
         state.days = {}; state.goals = { ...DEFAULT_GOALS }; state.weights = {};
         try { localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_UNSYNCED); localStorage.removeItem(LS_W_UNSYNCED); } catch {}
+        removeAiKey(true); // the Gemini key is yours too: don't leave it for the next person on a shared device
       }
       this.user = null; this.mode = "local";
       render(); renderAccount();
@@ -1376,6 +1371,8 @@ const store = {
       this.sb.auth.onAuthStateChange((_event, session) => setTimeout(() => this.onSession(session), 0));
       document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") this.refresh(); });
     }
+    // Coming back to the app (maybe the next morning): redraw so "today" is really today
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && this.mode !== "cloud") render(); });
     render(); renderAccount();
   },
 };
@@ -1559,7 +1556,7 @@ function renderMyFoods() {
     ? `<ul class="items" style="margin:0">${list.map(f => `<li class="item">
         <div><div class="name">${esc(f.name)}</div><div class="portion">${esc(f.label || "1 portion")}${f.aliases && f.aliases.length ? ` · also “${f.aliases.map(esc).join("”, “")}”` : ""}</div></div>
         <div class="kc">${Math.round(f.kcal)} kcal</div>
-        <div class="row-actions" style="gap:2px;flex-wrap:nowrap"><button class="linkbtn" data-editfood="${f.id}">Edit</button><button class="del" data-delfood="${f.id}" aria-label="Delete ${esc(f.name)}">×</button></div>
+        <div class="row-actions" style="gap:2px;flex-wrap:nowrap"><button class="linkbtn" data-editfood="${esc(f.id)}">Edit</button><button class="del" data-delfood="${esc(f.id)}" aria-label="Delete ${esc(f.name)}">×</button></div>
         ${macroLine(f)}
       </li>`).join("")}</ul>`
     : `<div class="empty">Nothing saved yet. Add a food below, or tap <b>Save to My foods</b> under anything you've logged.</div>`);
@@ -1640,7 +1637,8 @@ async function geminiError(r) {
 const AI_MODELS = "macro-ledger-gemini-models";
 const readModels = () => { try { return JSON.parse(ls.get(AI_MODELS) || "[]"); } catch { return []; } };
 async function refreshModels(key) {
-  const r = await fetch(`${GEMINI}/models?pageSize=1000&key=${encodeURIComponent(key)}`, { signal: timeout(15000) });
+  // The key goes in a header, not the address, so it doesn't end up in logs that record addresses
+  const r = await fetch(`${GEMINI}/models?pageSize=1000`, { headers: { "x-goog-api-key": key }, signal: timeout(15000) });
   if (!r.ok) throw await geminiError(r);
   const names = ((await r.json()).models || [])
     .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
@@ -1670,7 +1668,7 @@ function aiPrompt(text) {
   return `You are a careful nutrition estimator for a personal food log.
 Estimate the nutrition of each food in the description below.
 - Split it into separate food items. Respect any quantities, counts, sizes or weights given; otherwise assume a typical single serving. Words like "small", "some" or "a few pieces" should shrink the portion.
-- For dishes (including Indian and other regional dishes), assume a typical home-style or restaurant recipe as the description suggests, with usual oil/ghee/cheese.
+- For dishes (including Indian and other regional dishes), assume home cooking (about 1 teaspoon of oil or ghee per bowl, no cream or butter finish) unless the description says it's from a restaurant, street stall, hotel, takeaway or shop.
 - Values are for the whole portion eaten. kcal as a whole number; protein, carbs, fat and fiber in grams with at most one decimal.
 - "portion" is a short human description with an approximate weight or volume, e.g. "1 small pizza (300 g)".
 Reply with only JSON in exactly this shape:
@@ -1694,8 +1692,8 @@ async function aiEstimate(text, onModel = () => {}) {
   const key = aiKey();
   const call = async (model, think) => {
     try {
-      return await fetch(`${GEMINI}/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, signal: timeout(45000),
+      return await fetch(`${GEMINI}/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, signal: timeout(45000),
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: aiPrompt(text) }] }],
           // No temperature: Gemini 3 models can loop below their default of 1.0. The token cap stops any runaway answer.
@@ -2034,11 +2032,11 @@ function renderWeek(hd, today) {
 function homeTotal(date) {
   const entries = state.days[date] || [];
   const head = `<div class="sect-head"><h2 class="sect-title">Today's total</h2><span class="hint">${entries.length} item${entries.length === 1 ? "" : "s"} logged</span></div>`;
-  if (!entries.length) return head + `<div class="empty">Nothing logged yet today. <button class="linkbtn" data-go="log">Log your first meal</button></div>`;
+  if (!entries.length) return head + `<div class="empty">Nothing logged yet today. <button class="linkbtn" data-logmeal="">Log your first meal</button></div>`;
   return head + `<div class="home-split">${factsPanel(totals(entries))}
     <div><h3 class="mini-title">By meal</h3>${MEALS.map(m => {
       const list = entries.filter(e => e.meal === m);
-      return `<button class="bymeal-row" data-go="log"><span>${m}</span><span class="num">${list.length ? Math.round(totals(list).kcal) + " kcal" : "–"}</span></button>`;
+      return `<button class="bymeal-row" data-logmeal="${m}"><span>${m}</span><span class="num">${list.length ? Math.round(totals(list).kcal) + " kcal" : "–"}</span></button>`;
     }).join("")}</div></div>`;
 }
 
@@ -2149,6 +2147,9 @@ function closeComposer(animate = true) {
 }
 document.addEventListener("click", e => {
   const t = e.target;
+  // From Home: go to Log with that meal (or the one for this time of day) already open for typing
+  const lm = t.closest("[data-logmeal]");
+  if (lm) { go("log"); openComposer(lm.dataset.logmeal || defaultMeal(), false); setTimeout(() => $("foodText").focus(), 50); return; }
   const open = t.closest("[data-mopen]");
   if (open) { openComposer(open.dataset.mopen); return; }
   if (t.closest("[data-mclose]")) closeComposer();
@@ -2707,7 +2708,7 @@ function renderBell() {
 function renderNotePop() {
   const notes = state.goals.notes || [];
   $("notePop").innerHTML = `<div class="notepop-head"><h3>Notifications</h3><button class="linkbtn" id="notesRead"${unreadNotes() ? "" : " disabled"}>Mark all as read</button></div>
-    <div class="notelist">${notes.length ? notes.map(n => `<button class="noteitem${n.read ? "" : " unread"}" data-note="${n.id}"><span class="ndot"></span><span class="nt">${esc(n.title)}</span><span class="nw">${NOTE_KINDS[n.kind] || "Update"} · ${agoText(n.at)}</span></button>`).join("")
+    <div class="notelist">${notes.length ? notes.map(n => `<button class="noteitem${n.read ? "" : " unread"}" data-note="${esc(n.id)}"><span class="ndot"></span><span class="nt">${esc(n.title)}</span><span class="nw">${NOTE_KINDS[n.kind] || "Update"} · ${agoText(n.at)}</span></button>`).join("")
       : `<div class="empty">Nothing yet. You'll get a notification here when your maintenance or daily targets change, or when you reach your goal.</div>`}</div>`;
 }
 function toggleNotePop(open = $("notePop").hidden) {
@@ -2765,7 +2766,7 @@ function planFormHTML(p) {
   const g = state.goals, b = g.body || {}, t = planType();
   const kg = currentWeight(), plan = g.plan || {};
   const weeksLeft = t === "custom" && plan.end ? Math.max(1, Math.round((parseKey(plan.end) - parseKey(todayKey())) / (7 * 864e5))) : "";
-  const num = (id, label, v, attrs) => `<label class="field"><span>${label}</span><input id="${p}-${id}" type="number" inputmode="decimal" ${attrs} value="${v ?? ""}"></label>`;
+  const num = (id, label, v, attrs) => `<label class="field"><span>${label}</span><input id="${p}-${id}" type="number" inputmode="decimal" ${attrs} value="${esc(v ?? "")}"></label>`;
   const chip = (group, val, label, on) => `<button type="button" class="chip" data-pchip="${group}" data-val="${val}" aria-pressed="${on}">${label}</button>`;
   return `<div class="planform" id="${p}-plan" data-sex="${b.sex || ""}" data-activity="${b.activity || ""}" data-type="${t}">
     <div class="pgroup">
@@ -3004,7 +3005,66 @@ function renderAccount() {
   if (aiKey() && state.mode === "settings") refreshModels(aiKey())
     .then(() => { if ($("aiModelSel")) $("aiModelSel").innerHTML = modelOptions(); })
     .catch(() => {});
+  renderDanger();
 }
+
+/* ---------- Deleting your data ---------- */
+// Signed in: removes the account itself and everything in it (needs delete_my_account() in Supabase, see
+// supabase-delete-account.sql). Signed out: wipes everything this app saved in this browser.
+function renderDanger() {
+  const signedIn = !!store.user;
+  $("dangerZone").innerHTML = `<div class="sect-head"><h2 class="sect-title">${signedIn ? "Delete my account and data" : "Delete data on this device"}</h2></div>
+    <p class="hint" style="margin:0">${signedIn
+      ? "Permanently deletes your account, your sign-in and everything in it: every meal, weigh-in, goal, My foods and notification, on every device. This can't be undone."
+      : "Permanently deletes everything this app has saved in this browser: meals, weigh-ins, goals, My foods, your Gemini key and settings. This can't be undone."}
+      <button class="linkbtn" id="dangerBackup" type="button">Download a backup first</button></p>
+    <div class="row-actions"><button class="dangerbtn" id="deleteAcctBtn" type="button">${signedIn ? "Delete my account" : "Delete everything on this device"}</button></div>`;
+}
+function openDeleteDialog() {
+  const signedIn = !!store.user;
+  openOverlay(`
+    <span class="step" style="color:var(--warn)">Permanent</span>
+    <h2 id="dlgTitle">${signedIn ? "Delete your account?" : "Delete everything on this device?"}</h2>
+    <p>${signedIn ? `Your account <b style="color:var(--ink)">${esc(store.user.email)}</b> and all of its meals, weigh-ins, goals and My foods will be deleted from every device. You won't be able to sign in with it again unless you create a new account.`
+      : "All meals, weigh-ins, goals, My foods, your Gemini key and settings saved in this browser will be deleted."}</p>
+    <label class="field" style="grid-column:1/-1">Type DELETE to confirm<input id="delConfirm" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE"></label>
+    <div class="msg" id="delMsg" role="status"></div>
+    <div class="row-actions" style="justify-content:space-between">
+      <button class="linkbtn" id="delCancel" type="button">Keep my data</button>
+      <button class="dangerbtn" id="delGo" type="button" disabled>${signedIn ? "Delete my account" : "Delete everything"}</button>
+    </div>`, "delConfirm", "delete");
+}
+const APP_KEY = /^(macro-ledger-|sb-)/; // everything this app (and its sign-in library) keeps in the browser
+function wipeDevice() {
+  try { for (const k of Object.keys(localStorage)) if (APP_KEY.test(k)) localStorage.removeItem(k); } catch {}
+  try { sessionStorage.clear(); } catch {}
+}
+async function deleteEverything() {
+  const btn = $("delGo"), msg = text => authMsg("delMsg", text, true);
+  btn.disabled = true; btn.textContent = "Deleting…";
+  if (store.user) {
+    const { error } = await store.sb.rpc("delete_my_account");
+    if (error) {
+      btn.disabled = false; btn.textContent = "Delete my account";
+      return msg(/delete_my_account|PGRST202|Could not find/i.test(error.message || error.code || "")
+        ? "Account deletion isn't set up on this site yet. The site owner needs to run supabase-delete-account.sql once in Supabase (see SETUP.md)."
+        : "Couldn't delete the account. Check your connection and try again.");
+    }
+    store.user = null; // the account is gone; don't try to sync anything else to it
+    try { await store.sb.auth.signOut({ scope: "local" }); } catch {}
+  }
+  wipeDevice();
+  closeOverlay();
+  location.reload(); // start fresh, as a brand-new visitor
+}
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.id === "deleteAcctBtn") openDeleteDialog();
+  else if (t.id === "dangerBackup") exportBackup();
+  else if (t.id === "delCancel") closeOverlay();
+  else if (t.id === "delGo" && !t.disabled) deleteEverything();
+});
+document.addEventListener("input", e => { if (e.target.id === "delConfirm") $("delGo").disabled = e.target.value.trim() !== "DELETE"; });
 /* ---------- Themes ---------- */
 // Each card is a tiny copy of Home in that theme's own colours: a calorie ring and three macro bars
 function themePreview(th) {
@@ -3100,9 +3160,10 @@ async function saveAiKey(inputId = "aiKeyInput", msgId = "aiMsg") {
     return false;
   }
 }
-function removeAiKey() {
+function removeAiKey(quiet = false) {
   ls.set(AI_KEY, null); ls.set(AI_MODEL, null); ls.set(EST_MODE, null); ls.set(AI_THINK, null); ls.set(AI_MODELS, null);
   renderAccount(); renderEstMode();
+  if (quiet) return;
   authMsg("aiMsg", "Key removed from this device.");
 }
 async function setPassword() {
@@ -3118,9 +3179,15 @@ function exportBackup() {
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
+// Rebuilt field by field: only known fields with the right types come in from a backup file
 function cleanEntry(e) {
-  const o = { ...e, id: String(e.id), name: String(e.name || "Food").slice(0, 100), portion: String(e.portion || ""), meal: MEALS.includes(e.meal) ? e.meal : "Snacks" };
-  for (const n of NUTS) o[n.k] = Math.max(0, Number(e[n.k]) || 0);
+  const o = { id: String(e.id).slice(0, 40), name: String(e.name || "Food").slice(0, 100), portion: String(e.portion || "").slice(0, 80),
+    meal: MEALS.includes(e.meal) ? e.meal : "Snacks", source: String(e.source || "Backup").slice(0, 40), servings: Math.max(0, Number(e.servings) || 1), t: Number(e.t) || 0 };
+  for (const n of NUTS) o[n.k] = Math.max(0, Math.min(20000, Number(e[n.k]) || 0));
+  if (e.base && typeof e.base === "object") {
+    o.base = { label: String(e.base.label || "1 serving").slice(0, 60), g: Number(e.base.g) > 0 ? Number(e.base.g) : null };
+    for (const n of NUTS) o.base[n.k] = Math.max(0, Math.min(20000, Number(e.base[n.k]) || 0));
+  }
   return o;
 }
 async function importBackup(file) {
@@ -3142,8 +3209,31 @@ async function importBackup(file) {
     }
   }
   if (data.goals && typeof data.goals === "object") {
-    for (const n of NUTS) if (Number(data.goals[n.k]) > 0) state.goals[n.k] = Number(data.goals[n.k]);
-    for (const k of ["weightGoal", "weightStart", "weightSince", "hidden", "body", "plan", "myFoods"]) if (data.goals[k] != null) state.goals[k] = data.goals[k];
+    // A backup file can come from anywhere, so every value is checked and rebuilt rather than copied in
+    const g = data.goals, num = (v, lo, hi) => (Number(v) >= lo && Number(v) <= hi ? Number(v) : null), isDate = v => /^\d{4}-\d\d-\d\d$/.test(v);
+    for (const n of NUTS) if (num(g[n.k], 1, 20000) != null) state.goals[n.k] = Number(g[n.k]);
+    if (num(g.weightGoal, 20, 400) != null) state.goals.weightGoal = Number(g.weightGoal);
+    if (num(g.weightStart, 20, 400) != null) state.goals.weightStart = Number(g.weightStart);
+    if (isDate(g.weightSince)) state.goals.weightSince = g.weightSince;
+    if (Array.isArray(g.hidden)) state.goals.hidden = g.hidden.filter(k => NUTS.some(n => n.k === k && k !== "kcal"));
+    if (g.body && typeof g.body === "object") {
+      const b = g.body;
+      state.goals.body = { sex: b.sex === "f" ? "f" : b.sex === "m" ? "m" : null, age: num(b.age, 13, 100), height: num(b.height, 120, 230),
+        activity: ACTIVITY[b.activity] ? b.activity : null, weight: num(b.weight, 30, 300) };
+    }
+    if (g.plan && PLANS[g.plan.type] && g.plan.type !== "manual") {
+      state.goals.plan = { type: g.plan.type, since: isDate(g.plan.since) ? g.plan.since : todayKey(), ...(isDate(g.plan.end) ? { end: g.plan.end } : {}) };
+    }
+    if (Array.isArray(g.myFoods)) {
+      const have = new Set(myFoods().map(f => f.name.toLowerCase()));
+      const add = g.myFoods.filter(f => f && f.name && !have.has(String(f.name).toLowerCase())).slice(0, 300).map(f => {
+        const c = { id: uid(), name: String(f.name).slice(0, 80), aliases: (Array.isArray(f.aliases) ? f.aliases : []).map(a => String(a).slice(0, 60)).slice(0, 10),
+          label: String(f.label || "1 portion").slice(0, 60), g: num(f.g, 1, 5000), small: num(f.small, 0.1, 1) || 0.75, large: num(f.large, 1, 3) || 1.3 };
+        for (const n of NUTS) c[n.k] = Math.max(0, Math.min(20000, Number(f[n.k]) || 0));
+        return c;
+      });
+      state.goals.myFoods = [...myFoods(), ...add];
+    }
     store.saveGoals();
   }
   render();
@@ -3215,7 +3305,7 @@ function showOnboarding(step = 1) {
     </ol>
     <form class="searchrow" id="obAiForm"><input id="obAiKey" type="password" autocomplete="off" placeholder="Paste your Gemini API key" aria-label="Gemini API key"><button class="primary" type="submit">Save key</button></form>
     <div class="msg" id="obAiMsg" role="status"></div>
-    <p class="hint">Free with daily limits, no card needed. The key stays on this device, so add it on your other devices in Settings → Account. On the free tier Google may use what you send to improve its products; the app only sends the food you type.</p>`}
+    <p class="hint">Free with daily limits, no card needed. The key stays on this device, so add it on your other devices in Settings → Account. On the free tier Google may use what you send to improve its products; the app only sends the food you type and the names and numbers of foods you've saved in My foods.</p>`}
     <div class="row-actions" style="justify-content:space-between">
       <button class="linkbtn" id="obBack">Back</button>
       <button class="${aiKey() ? "primary" : "ghost"}" id="obSkipAi">${aiKey() ? "Finish" : "Skip for now"}</button>
@@ -3407,7 +3497,7 @@ function switchTab(next, animate = true) {
 const go = (page, animate = true) => switchTab(page, animate);
 
 function applyMode(to, tab) {
-  if (to === "settings") { state.backMode = state.mode; state.setTab = tab || "goals"; renderGoalsForm(); renderAccount(); renderThemes(); renderMyFoods(); }
+  if (to === "settings") { if (state.mode !== "settings") state.backMode = state.mode; state.setTab = tab || "goals"; renderGoalsForm(); renderAccount(); renderThemes(); renderMyFoods(); }
   else if (to === "weight") state.wpage = tab || "whome"; // each ledger opens on its Home
   else state.page = tab || "home";
   state.mode = to;
