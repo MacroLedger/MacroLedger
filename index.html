@@ -261,6 +261,72 @@ details.meal > .items { border-left: 2px solid var(--accent-soft); margin-left: 
 .meal-empty { display: flex; align-items: baseline; gap: 10px; padding: 10px 4px; border-bottom: 2px solid var(--ink); }
 .meal-empty h3 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 1rem; }
 .log { display: grid; gap: 18px; }
+/* "What did you eat?": four meal blocks. Hover grows one and shrinks the rest; tapping one fills the space as the
+   input area for that meal, and the other three shrink to small squares at the side where they were. */
+.composer { gap: 16px; }
+.mealgrid { position: relative; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 12px; }
+.mtile { position: relative; text-align: left; border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface) 70%);
+  display: grid; gap: 4px; align-content: start; min-height: 136px; min-width: 0; color: var(--ink);
+  transition: transform .28s cubic-bezier(.2, .8, .2, 1), opacity .28s ease, box-shadow .15s ease; }
+.micon { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); margin-bottom: 6px; flex: none; }
+.micon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.mtile h3 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em; }
+.mtile .mk { font-family: var(--f-display); font-weight: 800; font-size: 1.35rem; letter-spacing: -0.02em; line-height: 1.15; }
+.mtile .mk small { font-family: var(--f-body); font-weight: 500; font-size: .75rem; color: var(--muted); margin-left: 4px; }
+.mtile .mk small.mnone { margin: 0; font-size: .85rem; }
+.mcta { font-size: .78rem; color: var(--accent); font-weight: 600; margin-top: auto; padding-top: 6px; }
+@media (hover: hover) {
+  .mealgrid:not(.focused):has(.mtile:hover) .mtile { transform: scale(.96); opacity: .8; }
+  .mealgrid:not(.focused):has(.mtile:hover) .mtile:hover { transform: scale(1.04); opacity: 1; z-index: 1; } /* must out-rank the rule above */
+}
+/* One meal open: it fills the grid; the others become squares in bands above and below it */
+.mealgrid.focused { grid-template-columns: minmax(0, 1fr) auto; grid-auto-rows: auto; align-items: start; gap: 10px; }
+.mealgrid.focused #openTile { grid-column: 1; grid-row: 1; }
+#mealDots { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; gap: 8px; }
+.mtile.open { cursor: default; gap: 14px; padding: 16px; background: var(--surface); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+#openHead { display: flex; align-items: center; gap: 12px; }
+#openHead .micon { margin: 0; }
+.mtitle { flex: 1; min-width: 0; display: grid; }
+.composer-body { display: grid; gap: 14px; }
+/* Input area */
+.inputwrap { display: grid; gap: 6px; }
+.composer textarea { min-height: 112px; border: 1.5px solid var(--line); border-radius: 16px; padding: 14px 16px; font-size: 1rem; background: var(--bg); resize: none;
+  transition: border-color .15s ease, box-shadow .15s ease; }
+.composer textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+.inhint { font-size: .8rem; padding: 0 6px; }
+.examples { gap: 8px; }
+.extitle { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-right: 2px; }
+.composer .examples button { border: 0; background: var(--accent-soft); color: var(--ink); border-radius: 999px; padding: 5px 12px; font-size: .82rem; }
+.seg { display: inline-flex; justify-self: start; gap: 2px; padding: 3px; border-radius: 999px; background: var(--track); }
+.seg:empty { display: none; }
+.seg .hint { display: none; }
+.seg .chip { border: 0; background: transparent; padding: 6px 14px; font-weight: 600; font-size: .84rem; color: var(--muted); }
+.seg .chip[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px rgb(0 0 0 / .15); }
+.actrow { gap: 14px; }
+.bigbtn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; font-size: 1rem; }
+.bigbtn svg { width: 18px; height: 18px; fill: currentColor; }
+.composer .msg:empty { display: none; }
+.composer .search { border: 1px solid var(--line); border-radius: 14px; padding: 0; gap: 0; }
+.composer .search > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 13px; }
+.composer .search > summary::-webkit-details-marker { display: none; }
+.composer .search > summary > span:nth-child(2) { flex: 1; display: grid; }
+.composer .search[open] > summary .chev { transform: rotate(180deg); }
+.composer .search > :not(summary) { margin: 0 14px 12px; }
+.sicon { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--track); color: var(--muted); }
+.sicon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+@media (hover: hover) { .composer .search > summary:hover { background: var(--accent-soft); } }
+@media (max-width: 480px) { .actrow .bigbtn { flex: 1; justify-content: center; } }
+.mclose { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; padding: 0; color: var(--muted); }
+.mclose svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mdot { position: relative; width: 38px; height: 38px; border-radius: 11px; border: 1px solid var(--line); background: var(--surface); padding: 0;
+  display: grid; place-items: center; font-family: var(--f-display); font-weight: 800; font-size: .9rem; color: var(--muted); z-index: 2;
+  transition: transform .2s cubic-bezier(.2, .8, .2, 1), color .15s ease; }
+.mdot.has { color: var(--ink); }
+.mdot.has::after { content: ""; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.mdot:hover { transform: scale(1.12); color: var(--accent); }
+@media (max-width: 420px) { .mtile { padding: 12px 14px; min-height: 128px; } }
+@media (prefers-reduced-motion: reduce) { .mtile, .mdot { transition: none; } }
 
 /* Day total, set like a nutrition panel */
 .facts { border: 2px solid var(--ink); border-radius: 4px; padding: 8px 12px; max-width: 360px; }
@@ -561,37 +627,24 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
       <span class="status" id="log-left"></span>
     </div>
 
-    <section class="card" aria-label="Log food">
+    <section class="card composer" id="composer" aria-label="Log food">
       <div class="sect-head">
         <h2 class="sect-title">What did you eat?</h2>
-        <span class="hint" id="estHint">Foods you've logged before and the built-in list are recognised. Amounts help.</span>
+        <span class="hint" id="composeHint">Pick a meal to start</span>
       </div>
-      <textarea id="foodText" placeholder="e.g. 2 rotis, a bowl of dal, 100 g paneer and a cup of chai"></textarea>
-      <div class="examples" id="examples"><span class="hint">Try:</span></div>
-      <div class="meals" id="meals" role="group" aria-label="Meal"></div>
-      <div class="meals" id="estMode" role="group" aria-label="Estimate with"></div>
-      <div class="row-actions">
-        <button class="primary" id="estimateBtn">Estimate macros</button>
+      <div class="mealgrid" id="mealPick"></div>
+      <div class="composer-body" id="composerBody" hidden>
+      <div class="inputwrap">
+        <textarea id="foodText" placeholder="e.g. 2 rotis, a bowl of dal, 100 g paneer and a cup of chai"></textarea>
+        <span class="hint inhint" id="estHint">Foods you've logged before and the built-in list are recognised. Amounts help.</span>
+      </div>
+      <div class="examples" id="examples"><span class="extitle">Try</span></div>
+      <div class="seg" id="estMode" role="group" aria-label="Estimate with"></div>
+      <div class="row-actions actrow">
+        <button class="primary bigbtn" id="estimateBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>Estimate macros</button>
         <button class="linkbtn" id="manualBtn" type="button">Enter numbers myself</button>
-        <span class="msg" id="estMsg" role="status"></span>
       </div>
-      <p class="tipnote"><b>Tip:</b> eating something with a nutrition label? Use <b>Enter numbers myself</b> and copy the values from the label. It's more accurate than AI or list estimates.</p>
-      <div class="missed" id="missed"></div>
-      <div id="preview"></div>
-
-      <div class="search">
-        <div class="sect-head">
-          <h3 class="mini-title">Search food databases</h3>
-          <span class="hint">Packaged foods from Open Food Facts, ingredients from USDA.</span>
-        </div>
-        <form class="searchrow" id="searchForm">
-          <input id="searchQ" type="search" placeholder="e.g. Amul Gold milk, quinoa, Oreo" aria-label="Food to search for">
-          <button class="ghost" type="submit">Search</button>
-        </form>
-        <div class="msg" id="searchMsg" role="status"></div>
-        <ul class="items results" id="results"></ul>
-      </div>
-
+      <span class="msg" id="estMsg" role="status"></span>
       <div class="manual" id="manual" hidden>
         <div class="mgrid">
           <label class="field" style="grid-column: span 2">Food<input id="m-name" placeholder="Protein bar"></label>
@@ -602,6 +655,22 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
           <button class="primary" id="manualAdd" type="button">Add to log</button>
           <button class="linkbtn" id="manualCancel" type="button">Cancel</button>
         </div>
+      </div>
+      <p class="tipnote"><b>Tip:</b> eating something with a nutrition label? Use <b>Enter numbers myself</b> and copy the values from the label. It's more accurate than AI or list estimates.</p>
+      <div class="missed" id="missed"></div>
+      <div id="preview"></div>
+
+      <details class="search" id="searchBox">
+        <summary><span class="sicon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>
+          <span><b>Search food databases</b><span class="hint">Packaged foods from Open Food Facts, ingredients from USDA</span></span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></summary>
+        <form class="searchrow" id="searchForm">
+          <input id="searchQ" type="search" placeholder="e.g. Amul Gold milk, quinoa, Oreo" aria-label="Food to search for">
+          <button class="ghost" type="submit">Search</button>
+        </form>
+        <div class="msg" id="searchMsg" role="status"></div>
+        <ul class="items results" id="results"></ul>
+      </details>
       </div>
     </section>
 
@@ -1854,6 +1923,83 @@ function mealsHTML(date, scope) {
   }).join("") + (anything && scope === "hist" ? factsPanel(totals(entries)) : "");
 }
 
+// "What did you eat?": four meal blocks. Tapping one opens it in place as the input area for that meal; the
+// other three shrink to squares at their own corner, and tapping a square switches meals.
+state.composing = false;
+const MEAL_ICONS = {
+  Breakfast: `<path d="M12 3v3M4.2 7.2l2.1 2.1M19.8 7.2l-2.1 2.1M3 14h3M18 14h3"/><path d="M7 18a5 5 0 0 1 10 0"/><path d="M3 21h18"/>`,
+  Lunch: `<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/>`,
+  Snacks: `<path d="M5 9h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/><path d="M17 10.5h1.5a2.5 2.5 0 0 1 0 5H16.6"/><path d="M8.5 3.5c-.8 1 .8 1.8 0 2.8M12 3.5c-.8 1 .8 1.8 0 2.8"/>`,
+  Dinner: `<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>`,
+};
+const mealIcon = m => `<span class="micon"><svg viewBox="0 0 24 24" aria-hidden="true">${MEAL_ICONS[m]}</svg></span>`;
+function mealSoFar(m) {
+  const list = (state.days[todayKey()] || []).filter(e => e.meal === m);
+  return { n: list.length, kcal: Math.round(totals(list).kcal) };
+}
+// Draw the blocks (or the open meal with three squares). The input area itself is a fixed element that is
+// moved into the open block, so whatever you've typed survives redraws.
+function renderPicker(animate = false) {
+  const grid = $("mealPick"), body = $("composerBody"), before = new Map();
+  if (animate) for (const el of grid.querySelectorAll("[data-key]")) before.set(el.dataset.key, el.getBoundingClientRect());
+  const open = state.composing ? state.meal : null;
+  // Same meal still open: only refresh its header and the squares, leaving the input area alone
+  if (!animate && open && $("openTile") && $("openTile").dataset.key === open) { fillPicker(open); return; }
+  $("composer").appendChild(body); // park the input area before redrawing
+  grid.classList.toggle("focused", !!open);
+  $("composeHint").textContent = open ? "Tap a square to switch meals" : "Pick a meal to start";
+  grid.innerHTML = open
+    ? `<div id="mealDots"></div><div class="mtile open" id="openTile" data-key="${open}" role="region" aria-label="Logging ${open}"><div class="mh" id="openHead"></div></div>`
+    : MEALS.map(m => {
+        const s = mealSoFar(m);
+        return `<button class="mtile${s.n ? "" : " empty-meal"}" data-key="${m}" data-mopen="${m}" aria-label="Log ${m}${s.n ? `, ${s.kcal} kcal so far` : ""}">
+          ${mealIcon(m)}<span class="mh"><h3>${m}</h3></span>
+          <span class="mk">${s.n ? `${s.kcal}<small>kcal · ${s.n} item${s.n === 1 ? "" : "s"}</small>` : `<small class="mnone">Nothing yet</small>`}</span>
+          <span class="mcta">${s.n ? "Add more" : "Tap to log"} →</span></button>`;
+      }).join("");
+  body.hidden = !open;
+  if (open) { $("openTile").appendChild(body); fillPicker(open); }
+  if (!animate || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for (const el of grid.querySelectorAll("[data-key]")) {
+    const a = before.get(el.dataset.key), b = el.getBoundingClientRect();
+    if (!a || !b.width || !b.height) continue;
+    el.animate([{ transformOrigin: "top left", transform: `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width}, ${a.height / b.height})` },
+      { transformOrigin: "top left", transform: "none" }], { duration: 420, easing: "cubic-bezier(.2, .8, .2, 1)" });
+    if (el.id === "openTile") for (const c of el.children) c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 280, delay: 170, easing: "ease", fill: "backwards" });
+  }
+}
+function fillPicker(open) {
+  const s = mealSoFar(open);
+  $("openHead").innerHTML = `${mealIcon(open)}<div class="mtitle"><h3>${open}</h3><span class="hint">${s.n ? `${s.kcal} kcal so far · ${s.n} item${s.n === 1 ? "" : "s"}` : "Nothing logged yet"}</span></div>
+    <button class="mclose" data-mclose aria-label="Back to all meals" title="Back to all meals"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+  $("mealDots").innerHTML = MEALS.map((m, i) => {
+    if (m === open) return "";
+    const d = mealSoFar(m);
+    return `<button class="mdot${d.n ? " has" : ""}" data-key="${m}" data-mopen="${m}" title="${m}${d.n ? ` · ${d.kcal} kcal` : ""}" aria-label="Switch to ${m}">${m[0]}</button>`;
+  }).join("");
+}
+function openComposer(m, animate = true) {
+  if (state.composing && state.meal === m) return;
+  state.meal = m; state.composing = true;
+  renderPicker(animate); renderMeals(); renderRecs();
+  if (animate) setTimeout(() => $("foodText").focus({ preventScroll: true }), 430);
+}
+function closeComposer(animate = true) {
+  if (!state.composing) return;
+  state.composing = false;
+  renderPicker(animate);
+}
+document.addEventListener("click", e => {
+  const t = e.target;
+  const open = t.closest("[data-mopen]");
+  if (open) { openComposer(open.dataset.mopen); return; }
+  if (t.closest("[data-mclose]")) closeComposer();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && state.composing && state.page === "log" && state.mode === "main" && $("overlay").hidden && tourI < 0
+    && !["TEXTAREA", "INPUT"].includes(document.activeElement.tagName)) closeComposer();
+});
+
 const saveLink = (e, attrs) => (e.source === "My foods" || inMyFoods(e.name)
   ? `<span class="savedtag">★ In My foods</span>`
   : `<button class="linkbtn savelink" ${attrs}>☆ Save to My foods</button>`);
@@ -1879,7 +2025,7 @@ function factsPanel(t) {
 }
 
 function renderMeals() {
-  $("meals").innerHTML = MEALS.map(m => `<button class="chip" data-meal="${m}" aria-pressed="${m === state.meal}">${m}</button>`).join("");
+  renderPicker();
   if ($("addPending")) $("addPending").textContent = `Add to ${state.meal}`;
 }
 
@@ -2932,10 +3078,10 @@ const TOUR = [
   { mode: "main", tab: "home", target: "#home-ring", where: "Home", title: "Calories left today", text: "The ring fills as you eat. The big number is what's left of your daily calorie goal, or how far over you are." },
   { mode: "main", tab: "home", target: "#home-bars", where: "Home", title: "Your macros", text: "Your macros, eaten vs your goal. Carbs and fat say how much is left; protein and fiber say how much to go. Choose which ones show in Settings → Goals." },
   { mode: "main", tab: "home", target: "#home-total", where: "Home", title: "Today's total", text: "A nutrition-label summary of everything you've eaten today, plus calories for each meal. Tap a meal to jump to the Log." },
-  { mode: "main", tab: "log", target: "#foodText", where: "Log", title: "Type what you ate", text: "Write it the way you'd say it, like “2 rotis and a bowl of dal”. Amounts help. Then press Estimate macros." },
-  { mode: "main", tab: "log", target: "#meals", where: "Log", title: "Pick the meal", text: "Choose Breakfast, Lunch, Snacks or Dinner before adding. With a Gemini key, you can also switch between AI and the built-in list here." },
-  { mode: "main", tab: "log", target: "#estimateBtn", where: "Log", title: "Check, then add", text: "You'll see the estimate first. Adjust amounts or remove items, then add them to your log. Enter numbers myself is there for packaged foods with a label." },
-  { mode: "main", tab: "log", target: ".search", where: "Log", title: "Search food databases", text: "Can't find something? Search packaged foods and ingredients, pick a result and set the grams." },
+  { mode: "main", tab: "log", target: "#mealPick", compose: false, where: "Log", title: "Pick the meal", text: "Tap Breakfast, Lunch, Snacks or Dinner. That block opens up for typing, and the other meals shrink to small squares you can tap to switch." },
+  { mode: "main", tab: "log", target: "#foodText", compose: true, where: "Log", title: "Type what you ate", text: "Write it the way you'd say it, like “2 rotis and a bowl of dal”. Amounts help. With a Gemini key, you can switch between AI and the built-in list just below." },
+  { mode: "main", tab: "log", target: "#estimateBtn", compose: true, where: "Log", title: "Check, then add", text: "You'll see the estimate first. Adjust amounts or remove items, then add them to your log. Enter numbers myself is there for packaged foods with a label." },
+  { mode: "main", tab: "log", target: "#searchBox", compose: true, where: "Log", title: "Search food databases", text: "Can't find something? Open this to search packaged foods and ingredients, pick a result and set the grams." },
   { mode: "main", tab: "log", target: "#log-list", where: "Log", title: "Today's meals", text: "Each meal shows its totals. Tap it to see the foods inside, and the × to remove one (there's an Undo)." },
   { mode: "main", tab: "log", target: "#recs", where: "Log", title: "Suggestions", text: "Once you've logged a few days, this suggests foods you often eat on this weekday that fit what's left of your calories." },
   { mode: "main", tab: "history", target: ".datenav", where: "History", title: "Look back", text: "Move between days with the arrows, or tap a day in the week strip below." },
@@ -2983,6 +3129,7 @@ function showTourStep() {
   const s = TOUR[tourI], last = tourI === TOUR.length - 1;
   if (s.mode && state.mode !== s.mode) applyMode(s.mode, s.tab);
   else if (s.tab && currentTab() !== s.tab) switchTab(s.tab, false);
+  if (s.compose === true) openComposer(state.meal, false); else if (s.compose === false) closeComposer(false);
   $("tourTip").innerHTML = `<span class="where">${s.where}</span><h3 id="tourTitle">${s.title}</h3><p>${s.text}</p>
     <div class="tour-foot"><span class="count">${tourI + 1} / ${TOUR.length}</span>
       <div class="btns">${last ? "" : `<button class="linkbtn" id="tourSkip">Skip tour</button>`}${tourI > 0 ? `<button class="ghost" id="tourBack">Back</button>` : ""}<button class="primary" id="tourNext">${last ? "Finish" : tourI === 0 ? "Start" : "Next"}</button></div>
@@ -3211,7 +3358,6 @@ $("searchForm").addEventListener("submit", e => { e.preventDefault(); runSearch(
 
 $("examples").insertAdjacentHTML("beforeend", EXAMPLES.map(x => `<button type="button" data-ex="${esc(x)}">${esc(x)}</button>`).join(""));
 $("examples").addEventListener("click", e => { const b = e.target.closest("[data-ex]"); if (b) { $("foodText").value = b.dataset.ex; $("foodText").focus(); } });
-$("meals").addEventListener("click", e => { const b = e.target.closest("[data-meal]"); if (b) { state.meal = b.dataset.meal; render(); } });
 $("recs").addEventListener("click", e => {
   const b = e.target.closest("[data-rec]");
   const r = b && state.recs[Number(b.dataset.rec)];
