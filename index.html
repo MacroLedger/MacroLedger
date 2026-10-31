@@ -201,6 +201,9 @@ textarea { width: 100%; min-height: 76px; resize: vertical; border: 1px solid va
 .missed { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .preview { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .preview-head { background: var(--accent-soft); padding: 8px 12px; font-size: .85rem; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.sizes { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--track); }
+.sizes .chip { border: 0; background: transparent; color: var(--muted); padding: 2px 10px; font-size: .78rem; font-weight: 600; }
+.sizes .chip[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
 .serv { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: .82rem; color: var(--muted); }
 .serv input { width: 5.5em; border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; background: var(--bg); color: var(--ink); }
 .search { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
@@ -289,6 +292,19 @@ details.meal > .items { border-left: 2px solid var(--accent-soft); margin-left: 
 #openHead .micon { margin: 0; }
 .mtitle { flex: 1; min-width: 0; display: grid; }
 .composer-body { display: grid; gap: 14px; }
+.mtile .macros { font-size: .72rem; gap: 2px 9px; margin-top: 4px; }
+/* An open meal's own breakdown, above the input area */
+.mdetail { display: grid; gap: 10px; }
+.mmacros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; padding: 12px; border-radius: 14px; background: var(--bg); }
+.mmac:first-child { grid-column: 1 / -1; }
+.mmh { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: .85rem; }
+.mmh span { display: inline-flex; align-items: center; gap: 6px; }
+.mmh b { font-family: var(--f-mono); font-weight: 500; white-space: nowrap; }
+.mmh small { color: var(--muted); }
+.mmac .track { height: 7px; margin: 5px 0 3px; }
+.mpct { font-size: .72rem; color: var(--muted); }
+.mdetail .ptitle { margin-top: 4px; }
+.mdetail .items { border: 1px solid var(--line); border-radius: 12px; }
 /* Input area */
 .inputwrap { display: grid; gap: 6px; }
 .composer textarea { min-height: 112px; border: 1.5px solid var(--line); border-radius: 16px; padding: 14px 16px; font-size: 1rem; background: var(--bg); resize: none;
@@ -674,7 +690,6 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
       </div>
     </section>
 
-    <section class="log" id="log-list" aria-label="Today's meals"></section>
     <section class="card" id="recs" aria-label="Suggested foods"></section>
   </div>
 
@@ -767,45 +782,47 @@ const MEALS = ["Breakfast", "Lunch", "Snacks", "Dinner"];
 const EXAMPLES = ["2 boiled eggs and 2 slices of brown bread", "1 bowl rajma with 1 cup rice", "Chai and 2 marie biscuits", "1 scoop whey in 300 ml milk"];
 
 // Built-in foods. Per serving: [aliases, portion, grams per serving, kcal, protein, carbs, fat, fiber]
-// Typical published values for home-style recipes. (A trailing added-sugar column from an earlier version is ignored.)
+// Home-cooked dishes assume a home kitchen: about 1 tsp (5 g) oil per katori or paratha, no cream or butter finish.
+// Bought and fried foods (naan, samosa, pakora, momos, pizza…) keep typical shop values. (A trailing added-sugar column from an earlier version is ignored.)
 const FOODS = [
   // IIIT Allahabad BH1/BH4 mess. Portions are mess servings: dal, sabzi and gravies 150 ml (dry sabzis about 100 g),
-  // rice 100 g cooked (rice dishes 100 g of rice plus what's cooked into it), roti medium. Fried breads are napkin-blotted
-  // (about 20% less absorbed oil) and floating oil is skimmed off dals and gravies (about 3–5 g of oil left per katori).
+  // rice 100 g cooked (rice dishes 100 g of rice plus what's cooked into it), roti medium. Cooked like a home kitchen:
+  // about 1 tsp (5 g) oil per serving of dal, sabzi or gravy, no cream or butter finish; thin sambhar has less.
+  // Deep-fried breads are napkin-blotted (about 20% less absorbed oil).
   // These come first, so when a name also appears further down (puri, dal, chole…), the mess version wins.
   // Plates like pav bhaji are logged as their parts (see COMBOS), so each part's count can be set.
   [["puri","poori","ajwain puri","mess puri"],"1 (30 g)",30,109,2.4,14,4.8,2,0],
   [["bhatura","bhature","amritsari bhatura","amritsari bhature"],"1 (90 g)",90,296,6,42,11.6,1.5,0],
   [["chhole","chole","amritsari chhole","amritsari chole","chana masala"],"1 serving (150 ml)",150,209,8.3,27.5,7.3,7.5,0],
-  [["kaddu chola","kaddu chana"],"1 serving (150 ml)",150,141,5,18.5,5.2,4.5,0],
-  [["kaddu","kaddu sabzi","pumpkin sabzi","sitaphal"],"1 serving (150 ml)",150,90,1.5,12,4,2,0],
-  [["mix dal","mixed dal"],"1 serving (150 ml)",150,132,7.2,18,3.5,3.5,0],
-  [["arhar dal","toor dal","dal"],"1 serving (150 ml)",150,130,6.6,18,3.5,4.5,0],
-  [["chana dal tadka","chana dal"],"1 serving (150 ml)",150,145,6.6,18,5.2,5,0],
-  [["dal makhani"],"1 serving (150 ml)",150,155,7,17,6.5,5,0],
-  [["rajma","rajma masala"],"1 serving (150 ml)",150,152,8,21,4,5.5,0],
-  [["kaala channa","kaala chana","kala chana","black chana"],"1 serving (150 ml)",150,178,8,24,5.5,6.8,0],
+  [["kaddu chola","kaddu chana"],"1 serving (150 ml)",150,150,5,18.5,6.2,4.5,0],
+  [["kaddu","kaddu sabzi","pumpkin sabzi","sitaphal"],"1 serving (150 ml)",150,99,1.5,12,5,2,0],
+  [["mix dal","mixed dal"],"1 serving (150 ml)",150,150,7.2,18,5.5,3.5,0],
+  [["arhar dal","toor dal","dal"],"1 serving (150 ml)",150,148,6.6,18,5.5,4.5,0],
+  [["chana dal tadka","chana dal"],"1 serving (150 ml)",150,159,6.6,18,6.7,5,0],
+  [["dal makhani"],"1 serving (150 ml)",150,146,7,17,5.5,5,0],
+  [["rajma","rajma masala"],"1 serving (150 ml)",150,166,8,21,5.5,5.5,0],
+  [["kaala channa","kaala chana","kala chana","black chana"],"1 serving (150 ml)",150,191,8,24,7,6.8,0],
   [["kadhi","kadhi pakora","kadhi pakoda"],"1 serving (150 ml)",150,151,6,13,8.3,1.5,0],
   [["sambhar","sambar"],"1 serving (150 ml)",150,76,3,11,2.2,3,0],
-  [["kadhai paneer","kadai paneer"],"1 serving (150 ml)",150,231,11.5,8,17,2,0],
-  [["egg curry","anda curry"],"1 egg with gravy (100 g)",100,104,6.8,3.5,7,0.8,0],
+  [["kadhai paneer","kadai paneer"],"1 serving (150 ml)",150,183,8.4,7.4,13.3,2,0],
+  [["egg curry","anda curry"],"1 egg with gravy (100 g)",100,109,6.8,3.5,7.5,0.8,0],
   [["veg kofta","kofta curry","lauki kofta"],"1 kofta with gravy (100 g)",100,101,2.5,8,6.5,1.5,0],
-  [["chicken butter masala"],"1 serving (150 ml, about 4 pieces)",150,230,19,7,14,1,0],
-  [["soya chunks dry","dry soya chunks","soya chunks sabzi","soya chunk sabzi","soya sabzi"],"1 serving (150 ml, 100 g)",100,136,13.3,10.8,4.4,3.3,0],
+  [["chicken butter masala"],"1 serving (150 ml, about 4 pieces)",150,185,19,7,9,1,0],
+  [["soya chunks dry","dry soya chunks","soya chunks sabzi","soya chunk sabzi","soya sabzi"],"1 serving (150 ml, 100 g)",100,143,13.3,10.8,5.2,3.3,0],
   [["aloo bhujia","aloo ki bhujia"],"1 serving (150 ml, 100 g)",100,109,1.7,14.2,5.1,1.7,0],
-  [["cabbage aloo","aloo cabbage","patta gobi aloo","bandh gobi aloo"],"1 serving (150 ml, 100 g)",100,80,1.7,8.7,4.3,2.3,0],
-  [["gobi aloo","gobhi aloo","aloo gobi","aloo gobhi"],"1 serving (150 ml, 100 g)",100,83,2.2,8.8,4.3,2.5,0],
-  [["aloo tamatar","aloo tamatar sabzi"],"1 serving (150 ml)",150,104,2,16,3.6,2.5,0],
-  [["mix veg","mixed veg","mixed vegetable"],"1 serving (150 ml)",150,98,3,12,4.2,4,0],
+  [["cabbage aloo","aloo cabbage","patta gobi aloo","bandh gobi aloo"],"1 serving (150 ml, 100 g)",100,88,1.7,8.7,5.1,2.3,0],
+  [["gobi aloo","gobhi aloo","aloo gobi","aloo gobhi"],"1 serving (150 ml, 100 g)",100,90,2.2,8.8,5.1,2.5,0],
+  [["aloo tamatar","aloo tamatar sabzi"],"1 serving (150 ml)",150,118,2,16,5.1,2.5,0],
+  [["mix veg","mixed veg","mixed vegetable"],"1 serving (150 ml)",150,107,3,12,5.2,4,0],
   [["rice","plain rice","white rice","chawal"],"1 serving (100 g cooked)",100,130,2.7,28.2,0.3,0.4,0],
-  [["soya fried rice","veg soya fried rice","soya chunks fried rice"],"1 serving (133 g)",133,198,6.8,32.9,4.4,1.7,0],
-  [["fried rice","veg fried rice"],"1 serving (133 g)",133,175,3.3,30.7,4.3,1.3,0],
-  [["lemon rice"],"1 serving (133 g)",133,201,3.3,32,6.7,1.3,0],
+  [["soya fried rice","veg soya fried rice","soya chunks fried rice"],"1 serving (133 g)",133,207,6.8,32.9,5.4,1.7,0],
+  [["fried rice","veg fried rice"],"1 serving (133 g)",133,184,3.3,30.7,5.3,1.3,0],
+  [["lemon rice"],"1 serving (133 g)",133,189,3.3,32,5.3,1.3,0],
   [["tehri","tahri","tehari"],"1 serving (143 g)",143,194,3.8,32.8,5.3,1.4,0],
-  [["bhaji","pav ki bhaji"],"1 serving (150 ml)",150,159,4,20,7,5,0],
+  [["bhaji","pav ki bhaji"],"1 serving (150 ml)",150,146,4,20,5.5,5,0],
   [["butter pav","buttered pav","butter paav"],"1 (42 g)",42,120,3.5,20,2.9,0.8,0],
-  [["stuffed dosa"],"1 (200 g)",200,324,6,48,12,4,0],
-  [["stuffed paratha","gobi aloo paratha","aloo gobi paratha","gobi paratha","gobhi paratha"],"1 (120 g)",120,282,7.5,45,8,7,0],
+  [["stuffed dosa"],"1 (200 g)",200,279,6,48,7,4,0],
+  [["stuffed paratha","gobi aloo paratha","aloo gobi paratha","gobi paratha","gobhi paratha"],"1 (120 g)",120,273,7.5,45,7,7,0],
   [["dahi"],"1 katori (100 g)",100,62,3.5,4.7,3.3,0,0],
   [["boondi raita"],"1 serving (150 ml)",150,149,5.5,12.5,8.5,0.5,0],
   [["rooh afza lassi","roohafza lassi","rooh afza"],"1 glass (250 ml)",250,208,5,38,4,0,0],
@@ -823,24 +840,24 @@ const FOODS = [
   [["tandoori roti"],"1 (50 g)",50,140,4.5,26,2,3.5,0],
   [["butter naan"],"1 (100 g)",100,320,8.5,47,10.5,2,1.5],
   [["naan"],"1 (90 g)",90,262,8.7,45,5.1,1.9,1.5],
-  [["aloo paratha"],"1 (120 g)",120,300,6.5,40,12.5,4,0],
-  [["paratha"],"1 (80 g)",80,260,5,36,10,3,0],
+  [["aloo paratha"],"1 (120 g)",120,250,6.4,40.9,6.8,5.8,0],
+  [["paratha"],"1 (80 g)",80,203,5.4,32.4,5.8,4.8,0],
   [["puri","poori"],"1 (25 g)",25,100,1.7,11,5.5,0.7,0],
   [["bhatura"],"1 (80 g)",80,290,6,38,13,1.5,1],
-  [["thepla"],"1 (40 g)",40,120,3.3,16,4.8,2.5,0],
+  [["thepla"],"1 (40 g)",40,108,3.3,16,3.4,2.5,0],
   [["brown rice"],"1 cup cooked (160 g)",160,216,5,45,1.8,3.5,0],
-  [["jeera rice"],"1 cup (180 g)",180,260,4.5,46,6.5,1,0],
-  [["curd rice"],"1 bowl (250 g)",250,280,8,42,8,1,0],
+  [["jeera rice"],"1 cup (180 g)",180,234,4.6,46,3.5,0.7,0],
+  [["curd rice"],"1 bowl (250 g)",250,277,7.5,46.7,6.7,1,0],
   [["lemon rice"],"1 plate (200 g)",200,300,5,48,10,2,0],
   [["fried rice"],"1 plate (250 g)",250,420,9,62,14,2,1],
-  [["pulao","pulav","veg pulao"],"1 cup (200 g)",200,280,6,46,8,3,0],
-  [["chicken biryani"],"1 plate (300 g)",300,500,22,58,19,2.5,0],
-  [["mutton biryani"],"1 plate (300 g)",300,560,24,56,26,2,0],
-  [["biryani","veg biryani"],"1 plate (300 g)",300,420,9,62,14,4,0],
+  [["pulao","pulav","veg pulao"],"1 cup (200 g)",200,252,5.3,45,5.6,2.5,0],
+  [["chicken biryani"],"1 plate (300 g)",300,458,28.9,53,14.5,1.5,0],
+  [["mutton biryani"],"1 plate (300 g)",300,513,26.9,53,21.5,1.5,0],
+  [["biryani","veg biryani"],"1 plate (300 g)",300,359,7.4,63,8.6,3,0],
   [["rice","white rice","chawal"],"1 cup cooked (160 g)",160,205,4.3,45,0.4,0.6,0],
   [["khichdi"],"1 bowl (250 g)",250,230,8,38,5,4,0],
   [["poha"],"1 plate (200 g)",200,250,5,45,6,3,1],
-  [["upma"],"1 plate (200 g)",200,250,6,38,8,3,0],
+  [["upma"],"1 plate (200 g)",200,237,5.7,39,6.5,3,0],
   [["oats","oatmeal","porridge"],"40 g dry",40,150,5,27,2.5,4,0],
   [["muesli"],"50 g",50,190,5,33,3,4,8],
   [["cornflakes","corn flakes"],"30 g",30,113,2,25,0.2,1,3],
@@ -857,11 +874,11 @@ const FOODS = [
   [["maggi","instant noodles","ramen"],"1 pack (70 g)",70,310,7,45,12,2,1],
   [["hakka noodles","chowmein","chow mein","noodles"],"1 plate (250 g)",250,400,10,60,13,4,2],
   // South Indian and snacks
-  [["masala dosa"],"1 (200 g)",200,330,6,48,12,4,0],
-  [["rava dosa"],"1 (120 g)",120,230,4,32,9,1,0],
+  [["masala dosa"],"1 (200 g)",200,279,6,48,7,4,0],
+  [["rava dosa"],"1 (120 g)",120,189,4,32,5,1,0],
   [["dosa"],"1 plain (100 g)",100,168,3.9,29,3.7,1,0],
   [["idli"],"1 (40 g)",40,58,2,12,0.2,0.8,0],
-  [["uttapam"],"1 (150 g)",150,250,6,40,7,3,0],
+  [["uttapam"],"1 (150 g)",150,225,6,40,4.5,3,0],
   [["medu vada"],"1 (50 g)",50,140,4,14,8,2,0],
   [["sambar"],"1 bowl (200 g)",200,130,6,18,4,5,0],
   [["coconut chutney"],"2 tbsp (30 g)",30,70,0.8,2.5,6.5,1.5,0],
@@ -892,47 +909,48 @@ const FOODS = [
   [["french fries","fries"],"medium (117 g)",117,365,4,48,17,4.4,0],
   // Dals, curries and vegetables
   [["dal makhani"],"1 bowl (200 g)",200,300,10,28,16,8,0],
-  [["dal tadka","dal fry"],"1 bowl (200 g)",200,200,9,25,7,6,0],
-  [["moong dal"],"1 bowl (200 g)",200,160,10,22,3.5,5,0],
-  [["dal","toor dal","arhar dal","masoor dal"],"1 bowl (200 g)",200,180,9,24,5,6,0],
+  [["dal tadka","dal fry"],"1 katori (150 g)",150,141,7,18,4.5,3.5,0],
+  [["moong dal"],"1 katori (150 g)",150,132,7.3,18,3.4,2.5,0],
+  [["dal","toor dal","arhar dal","masoor dal"],"1 katori (150 g)",150,137,7.2,18,4,3.5,0],
   [["rajma"],"1 bowl (200 g)",200,220,10,32,5,9,0],
   [["chole","chana masala","chickpea curry"],"1 bowl (200 g)",200,260,10,35,9,9,0],
   [["kadhi"],"1 bowl (200 g)",200,160,5,12,10,1,1],
   [["sambhar"],"1 bowl (200 g)",200,130,6,18,4,5,0],
   [["aloo gobi"],"1 bowl (150 g)",150,160,3.5,17,9,4,0],
-  [["bhindi","bhindi masala","okra"],"1 katori (100 g)",100,94,2,8,6,3.3,0],
-  // Home-style sabzis: dry ones 1 katori (about 100 g) with about 5 g oil, gravies 1 katori (150 g) with about 6 g oil
+  [["bhindi","bhindi masala","okra"],"1 katori (100 g)",100,87,2,8,5.2,3.3,0],
+  // Home-kitchen sabzis: about 1 tsp (5 g) oil per katori, whether dry (about 100 g) or gravy (150 g); no cream or
+  // butter finish, paneer dishes about 40 g paneer per katori. Restaurant versions usually have 2–3 times the fat.
   [["aloo shimla mirch","aloo shimlamirch","shimla mirch aloo","aloo capsicum","capsicum aloo","shimla mirch"],"1 katori (100 g)",100,102,1.6,12.3,5.1,2,0],
   [["lauki chana dal","lauki chana"],"1 katori (150 g)",150,107,4.5,12,4.5,3,0],
   [["lauki","lauki sabzi","ghiya","dudhi","bottle gourd"],"1 katori (150 g)",150,65,1,6,4.1,1.5,0],
   [["tinde","tinda","tinday","round gourd"],"1 katori (100 g)",100,71,1.3,5,5.1,1.6,0],
   [["tori","torai","turai","ridge gourd"],"1 katori (100 g)",100,59,1,4.5,4.1,1.5,0],
   [["parwal","parval","pointed gourd"],"1 katori (100 g)",100,71,1.8,4.5,5.1,2.6,0],
-  [["karela","karele","bitter gourd"],"1 katori (100 g)",100,98,1.5,7,7.1,2.5,0],
-  [["arbi","arbi sabzi","colocasia","taro"],"1 katori (100 g)",100,157,1.4,24,6.1,3.7,0],
-  [["jeera aloo","aloo jeera"],"1 katori (100 g)",100,129,1.9,16.6,6.1,2,0],
-  [["aloo matar","matar aloo","aloo mutter"],"1 katori (150 g)",150,145,3.3,19.3,6.1,3.8,0],
-  [["aloo methi","methi aloo"],"1 katori (100 g)",100,116,2.5,13.8,5.6,2.2,0],
-  [["aloo palak","palak aloo"],"1 katori (150 g)",150,119,3.6,12.1,6.2,3,0],
-  [["aloo baingan","baingan aloo"],"1 katori (100 g)",100,99,1.3,9.6,6.1,2.5,0],
+  [["karela","karele","bitter gourd"],"1 katori (100 g)",100,80,1.5,7,5.1,2.5,0],
+  [["arbi","arbi sabzi","colocasia","taro"],"1 katori (100 g)",100,148,1.4,24,5.1,3.7,0],
+  [["jeera aloo","aloo jeera"],"1 katori (100 g)",100,120,1.9,16.6,5.1,2,0],
+  [["aloo matar","matar aloo","aloo mutter"],"1 katori (150 g)",150,136,3.3,19.3,5.1,3.8,0],
+  [["aloo methi","methi aloo"],"1 katori (100 g)",100,111,2.5,13.8,5.1,2.2,0],
+  [["aloo palak","palak aloo"],"1 katori (150 g)",150,110,3.6,12.1,5.2,3,0],
+  [["aloo baingan","baingan aloo"],"1 katori (100 g)",100,90,1.3,9.6,5.1,2.5,0],
   [["beans aloo","aloo beans","french beans","beans sabzi","beans"],"1 katori (100 g)",100,91,1.8,9.4,5.1,2.4,0],
   [["gajar matar","matar gajar"],"1 katori (100 g)",100,100,2.5,10.8,5.2,3.5,0],
   [["patta gobi","cabbage sabzi","bandh gobi","band gobhi"],"1 katori (100 g)",100,74,1.3,5.6,5.1,2.2,0],
   [["phool gobi","gobi","gobhi","cauliflower sabzi"],"1 katori (100 g)",100,74,1.8,5.2,5.1,2,0],
-  [["sarson ka saag","sarson saag","saag"],"1 katori (150 g)",150,145,4,12,9,4.5,0],
-  [["kathal","kathal sabzi","jackfruit sabzi"],"1 katori (150 g)",150,182,2.3,27,7.2,2.5,0],
-  [["mushroom matar","matar mushroom","mushroom masala"],"1 katori (150 g)",150,118,3.8,9.6,7.2,2.8,0],
+  [["sarson ka saag","sarson saag","saag"],"1 katori (150 g)",150,118,4,12,6,4.5,0],
+  [["kathal","kathal sabzi","jackfruit sabzi"],"1 katori (150 g)",150,164,2.3,27,5.2,2.5,0],
+  [["mushroom matar","matar mushroom","mushroom masala"],"1 katori (150 g)",150,100,3.8,9.6,5.2,2.8,0],
   [["lobia","lobiya","rongi","black eyed peas"],"1 katori (150 g)",150,166,8,21,5.5,3.8,0],
-  [["malai kofta"],"1 kofta with gravy (100 g)",100,173,4,10,13,1.3,0],
-  [["aloo sabzi","potato curry","aloo curry","dum aloo"],"1 bowl (150 g)",150,170,3,22,8,3,0],
-  [["baingan bharta","baingan"],"1 bowl (150 g)",150,130,3,12,8,5,0],
-  [["sabzi","mixed veg","vegetable curry","veg curry"],"1 bowl (150 g)",150,150,4,15,8,5,0],
-  [["palak paneer"],"1 katori (150 g)",150,227,10.5,7.5,17.2,3,0],
-  [["paneer butter masala","butter paneer"],"1 bowl (200 g)",200,400,16,14,32,2,4],
-  [["shahi paneer"],"1 bowl (200 g)",200,420,15,14,34,2,5],
-  [["matar paneer","mutter paneer"],"1 katori (150 g)",150,246,10.5,12,17.3,3,0],
+  [["malai kofta"],"1 kofta with gravy (100 g)",100,146,4,10,10,1.3,0],
+  [["aloo sabzi","potato curry","aloo curry","dum aloo"],"1 katori (150 g)",150,125,2,17.8,5.1,2,0],
+  [["baingan bharta","baingan"],"1 katori (150 g)",150,96,1.8,10.5,5.2,4,0],
+  [["sabzi","mixed veg","vegetable curry","veg curry"],"1 katori (150 g)",150,107,3,12,5.2,4,0],
+  [["palak paneer"],"1 katori (150 g)",150,193,10.3,7,13.7,2.5,0],
+  [["paneer butter masala","butter paneer"],"1 katori (150 g)",150,234,10.2,7.8,18,1.5,0],
+  [["shahi paneer"],"1 katori (150 g)",150,250,10.5,8,19.5,1,0],
+  [["matar paneer","mutter paneer"],"1 katori (150 g)",150,203,9.6,11,13.4,3,0],
   [["paneer tikka"],"150 g",150,330,22,8,23,1.5,0],
-  [["paneer bhurji"],"150 g",150,320,18,8,24,1.5,0],
+  [["paneer bhurji"],"1 katori (150 g)",150,281,15,8,21,1.5,0],
   [["paneer","cottage cheese"],"100 g",100,265,18,3.5,20,0,0],
   [["tofu"],"100 g",100,144,15.6,3,8.7,2.3,0],
   [["soya chunks","soy chunks","nutrela"],"50 g dry",50,173,26,16.5,0.3,6.5,0],
@@ -961,17 +979,17 @@ const FOODS = [
   [["omelette","omelet"],"2 eggs (120 g)",120,190,13,1.5,15,0.3,0],
   [["bhurji","egg bhurji","scrambled egg","scrambled eggs"],"2 eggs (120 g)",120,200,13,3,15,0.5,0],
   [["boiled egg","egg","anda"],"1 large (50 g)",50,72,6.3,0.4,4.8,0,0],
-  [["butter chicken"],"1 bowl (200 g)",200,380,28,10,26,2,4],
-  [["chicken curry","chicken gravy"],"1 bowl (200 g)",200,300,26,8,18,2,0],
+  [["butter chicken"],"1 katori (150 g)",150,237,23,7,13,1,0],
+  [["chicken curry","chicken gravy"],"1 katori (150 g)",150,228,25,5,12,1,0],
   [["chicken tikka"],"150 g",150,225,33,4,8,1,0],
   [["tandoori chicken"],"1 leg (180 g)",180,250,30,4,12,1,0],
   [["fried chicken"],"1 piece (140 g)",140,390,30,11,24,0.5,0],
   [["chicken nuggets","nuggets"],"6 pieces (96 g)",96,280,14,16,17,1,0],
   [["chicken thigh"],"100 g cooked",100,209,26,0,10.9,0,0],
   [["chicken breast","grilled chicken","chicken"],"100 g cooked",100,165,31,0,3.6,0,0],
-  [["mutton curry","lamb curry"],"1 bowl (200 g)",200,380,28,8,26,2,0],
+  [["mutton curry","lamb curry"],"1 katori (150 g)",150,266,21,5,18,1,0],
   [["mutton","lamb"],"100 g cooked",100,294,25,0,21,0,0],
-  [["fish curry"],"1 bowl (200 g)",200,260,24,6,15,1.5,0],
+  [["fish curry"],"1 katori (150 g)",150,181,21,4,9,1,0],
   [["salmon"],"100 g cooked",100,208,20,0,13,0,0],
   [["tuna"],"100 g canned in water",100,116,26,0,0.8,0,0],
   [["prawns","shrimp","prawn"],"100 g cooked",100,99,24,0.2,0.3,0,0],
@@ -1358,7 +1376,7 @@ function comboItems(p) {
   const q = qtyOf(p);
   return c.parts.map(([alias, n, counted]) => {
     const f = ALIASES.find(([a]) => a === alias)[1];
-    return makeItem(cap(f[0][0]), builtinBase(f), counted && q && q.n ? q.n : n, "Built-in list");
+    return builtinItem(f, counted ? p : "", counted && q && q.n ? q.n : n);
   });
 }
 const splitParts = text =>text.toLowerCase().split(/,|;|\n|\+|&|\band\b|\bwith\b|\bin\b/).map(s => s.trim()).filter(Boolean);
@@ -1371,12 +1389,15 @@ function localEstimate(text) {
     const combo = comboItems(p);
     if (combo) { items.push(...combo); continue; }
     const q = qtyOf(p), hm = matchHistory(p, hist), bf = matchBuiltin(p);
-    if (hm && (hm.strong || !bf)) {
-      const e = hm.h.e, base = baseOf(e);
-      items.push(makeItem(e.name, base, servingsFor(q, base, e.base ? (e.servings || 1) : 1), "From your log"));
+    // Foods first logged from the built-in list come from the list again (current values, true medium size)
+    if (hm && (hm.strong || !bf) && !(bf && hm.h.e.source === "Built-in list")) {
+      const e = hm.h.e, med = baseOf(e), bread = BREADS.has(String(e.name).toLowerCase());
+      const size = bread && !(q && q.grams != null) ? sizeWord(p) : "medium", base = scaleBase(med, size);
+      const it = makeItem(e.name, base, servingsFor(q, base, e.base ? (e.servings || 1) : 1), "From your log");
+      if (bread) it.bread = { med, size };
+      items.push(it);
     } else if (bf) {
-      const base = sizedBase(builtinBase(bf), p);
-      items.push(makeItem(cap(bf[0][0]), base, servingsFor(q, base, 1), "Built-in list"));
+      items.push(builtinItem(bf, p));
     } else missed.push(p);
   }
   return { items, missed };
@@ -1396,12 +1417,25 @@ function myFoodMatch(p) {
   return best && best.f;
 }
 // Small and large scale the usual portion (unless a weight was typed)
-function sizedBase(base, p, small = 0.75, large = 1.3) {
-  const q = qtyOf(p), sw = p.match(/\b(small|mini|little|medium|regular|normal|large|big|jumbo)\b/), size = sw && SIZES[sw[1]];
-  if (!size || size === "medium" || (q && q.grams != null)) return base;
+const sizeWord = p => { const sw = p.match(/\b(small|mini|little|medium|regular|normal|large|big|jumbo)\b/); return sw ? SIZES[sw[1]] : "medium"; };
+function scaleBase(base, size, small = 0.75, large = 1.3) {
+  if (size === "medium") return base;
   const mult = size === "small" ? small : large, sized = { label: `1 ${size}${base.g ? ` (${Math.round(base.g * mult)} g)` : ""}`, g: base.g ? base.g * mult : null };
   for (const n of NUTS) sized[n.k] = base[n.k] * mult;
   return sized;
+}
+function sizedBase(base, p, small = 0.75, large = 1.3) {
+  const q = qtyOf(p);
+  return q && q.grams != null ? base : scaleBase(base, sizeWord(p), small, large);
+}
+// Breads get Small / Medium / Large buttons in the estimate; medium is the list's usual size
+const BREADS = new Set(["roti", "tandoori roti", "naan", "butter naan", "paratha", "aloo paratha", "stuffed paratha", "thepla", "puri", "bhatura",
+  "pav", "butter pav", "bread", "brown bread", "dosa", "masala dosa", "rava dosa", "stuffed dosa", "uttapam"]);
+function builtinItem(f, p, count) {
+  const med = builtinBase(f), q = qtyOf(p), size = q && q.grams != null ? "medium" : sizeWord(p), base = scaleBase(med, size);
+  const it = makeItem(cap(f[0][0]), base, count ?? servingsFor(q, base, 1), "Built-in list");
+  if (BREADS.has(f[0][0])) it.bread = { med, size };
+  return it;
 }
 // "medium sized bhatura x 3" → 3 × your medium bhatura
 function myFoodItem(p, f) {
@@ -1743,7 +1777,7 @@ function addEntries(items, meal) {
   const date = todayKey();
   const list = state.days[date] = (state.days[date] || []).slice();
   for (const it of items) {
-    const { note, ...rest } = it;
+    const { note, bread, ...rest } = it; // the size picker's data isn't needed once logged
     list.push({ ...rest, id: uid(), meal, t: Date.now() });
   }
   store.saveDay(date);
@@ -1799,7 +1833,6 @@ function render() {
   $("log-date").textContent = longDate(today);
   $("log-left").textContent = left >= 0 ? `${Math.round(left)} kcal left` : `${Math.round(-left)} kcal over`;
   $("log-left").classList.toggle("over", left < 0);
-  $("log-list").innerHTML = mealsHTML(today, "log");
 
   // History
   if (state.histDate > today) state.histDate = today;
@@ -1934,8 +1967,22 @@ const MEAL_ICONS = {
 };
 const mealIcon = m => `<span class="micon"><svg viewBox="0 0 24 24" aria-hidden="true">${MEAL_ICONS[m]}</svg></span>`;
 function mealSoFar(m) {
-  const list = (state.days[todayKey()] || []).filter(e => e.meal === m);
-  return { n: list.length, kcal: Math.round(totals(list).kcal) };
+  const list = (state.days[todayKey()] || []).filter(e => e.meal === m), t = totals(list);
+  return { n: list.length, kcal: Math.round(t.kcal), t, list };
+}
+// Inside an open meal: each macro against your daily goal, then the foods (with remove and Save to My foods)
+function mealDetailHTML(m) {
+  const s = mealSoFar(m), g = state.goals;
+  if (!s.n) return "";
+  const pct = k => (g[k] > 0 ? Math.round((s.t[k] / g[k]) * 100) : 0);
+  return `<div class="mdetail">
+    <div class="mmacros">${[NUTS[0], ...shownNuts()].map(n => `<div class="mmac">
+      <div class="mmh"><span><span class="dot" style="background:var(--${n.k})"></span>${n.label}</span><b>${n.k === "kcal" ? Math.round(s.t.kcal) : r1(s.t[n.k])}<small>${n.k === "kcal" ? " kcal" : " g"}</small></b></div>
+      <div class="track"><div class="fill" style="width:${Math.min(100, pct(n.k))}%;--c:var(--${n.k})"></div></div>
+      <span class="mpct">${pct(n.k)}% of daily goal</span></div>`).join("")}</div>
+    <h4 class="ptitle">In ${m.toLowerCase()}</h4>
+    <ul class="items">${s.list.map(e => itemRow(e, todayKey())).join("")}</ul>
+  </div>`;
 }
 // Draw the blocks (or the open meal with three squares). The input area itself is a fixed element that is
 // moved into the open block, so whatever you've typed survives redraws.
@@ -1949,12 +1996,13 @@ function renderPicker(animate = false) {
   grid.classList.toggle("focused", !!open);
   $("composeHint").textContent = open ? "Tap a square to switch meals" : "Pick a meal to start";
   grid.innerHTML = open
-    ? `<div id="mealDots"></div><div class="mtile open" id="openTile" data-key="${open}" role="region" aria-label="Logging ${open}"><div class="mh" id="openHead"></div></div>`
+    ? `<div id="mealDots"></div><div class="mtile open" id="openTile" data-key="${open}" role="region" aria-label="Logging ${open}"><div class="mh" id="openHead"></div><div id="openDetail"></div></div>`
     : MEALS.map(m => {
         const s = mealSoFar(m);
         return `<button class="mtile${s.n ? "" : " empty-meal"}" data-key="${m}" data-mopen="${m}" aria-label="Log ${m}${s.n ? `, ${s.kcal} kcal so far` : ""}">
           ${mealIcon(m)}<span class="mh"><h3>${m}</h3></span>
           <span class="mk">${s.n ? `${s.kcal}<small>kcal · ${s.n} item${s.n === 1 ? "" : "s"}</small>` : `<small class="mnone">Nothing yet</small>`}</span>
+          ${s.n ? macroLine(s.t) : ""}
           <span class="mcta">${s.n ? "Add more" : "Tap to log"} →</span></button>`;
       }).join("");
   body.hidden = !open;
@@ -1972,6 +2020,7 @@ function fillPicker(open) {
   const s = mealSoFar(open);
   $("openHead").innerHTML = `${mealIcon(open)}<div class="mtitle"><h3>${open}</h3><span class="hint">${s.n ? `${s.kcal} kcal so far · ${s.n} item${s.n === 1 ? "" : "s"}` : "Nothing logged yet"}</span></div>
     <button class="mclose" data-mclose aria-label="Back to all meals" title="Back to all meals"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+  $("openDetail").innerHTML = mealDetailHTML(open);
   $("mealDots").innerHTML = MEALS.map((m, i) => {
     if (m === open) return "";
     const d = mealSoFar(m);
@@ -2044,6 +2093,7 @@ function renderPreview() {
           <div class="serv">
             <label>Amount <input type="number" min="0" step="${grams ? 5 : 0.25}" inputmode="decimal" data-serv="${e.id}" value="${grams ? Math.round(e.servings * 100) : e.servings}"></label>
             <span>${grams ? "g" : "× " + esc(e.base.label)}</span>
+            ${e.bread ? `<span class="sizes" role="group" aria-label="Size">${["small", "medium", "large"].map(s => `<button class="chip" data-size="${s}" data-sizeid="${e.id}" aria-pressed="${e.bread.size === s}">${cap(s)}</button>`).join("")}</span>` : ""}
             <span class="tag plain">${esc(e.source)}</span>${e.note ? `<span class="tag warn">${esc(e.note)}</span>` : ""}${saveLink(e, `data-savepending="${e.id}"`)}
           </div>
           ${macroLine(e)}
@@ -3082,7 +3132,7 @@ const TOUR = [
   { mode: "main", tab: "log", target: "#foodText", compose: true, where: "Log", title: "Type what you ate", text: "Write it the way you'd say it, like “2 rotis and a bowl of dal”. Amounts help. With a Gemini key, you can switch between AI and the built-in list just below." },
   { mode: "main", tab: "log", target: "#estimateBtn", compose: true, where: "Log", title: "Check, then add", text: "You'll see the estimate first. Adjust amounts or remove items, then add them to your log. Enter numbers myself is there for packaged foods with a label." },
   { mode: "main", tab: "log", target: "#searchBox", compose: true, where: "Log", title: "Search food databases", text: "Can't find something? Open this to search packaged foods and ingredients, pick a result and set the grams." },
-  { mode: "main", tab: "log", target: "#log-list", where: "Log", title: "Today's meals", text: "Each meal shows its totals. Tap it to see the foods inside, and the × to remove one (there's an Undo)." },
+  { mode: "main", tab: "log", target: "#mealPick", compose: false, where: "Log", title: "Today's meals", text: "Each block shows that meal's calories and macros. Open one to see its foods and a full macro breakdown, add more, or tap × on a food to remove it (there's an Undo)." },
   { mode: "main", tab: "log", target: "#recs", where: "Log", title: "Suggestions", text: "Once you've logged a few days, this suggests foods you often eat on this weekday that fit what's left of your calories." },
   { mode: "main", tab: "history", target: ".datenav", where: "History", title: "Look back", text: "Move between days with the arrows, or tap a day in the week strip below." },
   { mode: "main", tab: "history", target: "#week", where: "History", title: "Your week at a glance", text: "Each column is a day's calories against your goal line. Tap one to open that day's meals and totals." },
@@ -3372,12 +3422,22 @@ $("preview").addEventListener("change", e => {
     if (x.id !== id) return x;
     const v = Math.max(0, Number(e.target.value) || 0);
     const it = makeItem(x.name, x.base, x.base.label === "100 g" ? v / 100 : v, x.source, x.note);
-    it.id = x.id;
+    it.id = x.id; it.bread = x.bread;
     return it;
   });
   renderPreview();
 });
 $("preview").addEventListener("click", e => {
+  const sz = e.target.closest("[data-size]");
+  if (sz) { // Small / Medium / Large for a bread: same count, different size
+    state.pending = state.pending.map(x => {
+      if (x.id !== sz.dataset.sizeid) return x;
+      const it = makeItem(x.name, scaleBase(x.bread.med, sz.dataset.size), x.servings, x.source, x.note);
+      it.id = x.id; it.bread = { med: x.bread.med, size: sz.dataset.size };
+      return it;
+    });
+    renderPreview(); return;
+  }
   const drop = e.target.closest("[data-drop]");
   if (drop) { state.pending = state.pending.filter(x => x.id !== drop.dataset.drop); if (!state.pending.length) state.pending = null; renderPreview(); return; }
   if (e.target.id === "addPending") {
