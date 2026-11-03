@@ -310,8 +310,18 @@ details.meal > .items { border-left: 2px solid var(--accent-soft); margin-left: 
 .mmh small { color: var(--muted); }
 .mmac .track { height: 7px; margin: 5px 0 3px; }
 .mpct { font-size: .72rem; color: var(--muted); }
-.mdetail .ptitle { margin-top: 4px; }
 .mdetail .items { border: 1px solid var(--line); border-radius: 12px; }
+.mfold { border: 1px solid var(--line); border-radius: 14px; }
+.mfold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 13px; }
+.mfold > summary::-webkit-details-marker { display: none; }
+.mfold > summary > span { flex: 1; display: grid; }
+.mfold[open] > summary .chev { transform: rotate(180deg); }
+.mfold > .mdetail { padding: 0 12px 12px; }
+/* Estimate floats and stays in reach while you scroll the open meal */
+.composer .actrow { position: sticky; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; justify-self: start; pointer-events: none; }
+.composer .actrow .bigbtn { pointer-events: auto; box-shadow: 0 0 0 4px color-mix(in srgb, var(--surface) 70%, transparent), 0 14px 30px -10px color-mix(in srgb, var(--accent) 60%, rgb(0 0 0 / .6)); }
+.manuallink { justify-self: start; margin-top: -6px; }
+@media (max-width: 640px) { .composer .actrow { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); } }
 /* Input area */
 .inputwrap { display: grid; gap: 6px; }
 .composer textarea { min-height: 112px; border: 1.5px solid var(--line); border-radius: 16px; padding: 14px 16px; font-size: 1rem; background: var(--bg); resize: none;
@@ -834,8 +844,8 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
       <div class="seg" id="estMode" role="group" aria-label="Estimate with"></div>
       <div class="row-actions actrow">
         <button class="primary bigbtn" id="estimateBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>Estimate macros</button>
-        <button class="linkbtn" id="manualBtn" type="button">Enter numbers myself</button>
       </div>
+      <button class="linkbtn manuallink" id="manualBtn" type="button">Enter numbers myself</button>
       <span class="msg" id="estMsg" role="status"></span>
       <div class="manual" id="manual" hidden>
         <div class="mgrid">
@@ -2245,20 +2255,25 @@ function mealSoFar(m) {
   const list = (state.days[todayKey()] || []).filter(e => e.meal === m), t = totals(list);
   return { n: list.length, kcal: Math.round(t.kcal), t, list };
 }
-// Inside an open meal: each macro against your daily goal, then the foods (with remove and Save to My foods)
+// Inside an open meal: a fold (closed by default, so the input stays near the top) with each macro against
+// your daily goal, then the foods (with remove and Save to My foods)
 function mealDetailHTML(m) {
   const s = mealSoFar(m), g = state.goals;
   if (!s.n) return "";
   const pct = k => (g[k] > 0 ? Math.round((s.t[k] / g[k]) * 100) : 0);
-  return `<div class="mdetail">
+  return `<details class="mfold" id="mealFold"${state.foldOpen ? " open" : ""}>
+    <summary><span><b>Logged in ${m.toLowerCase()}</b><span class="hint">${s.n} item${s.n === 1 ? "" : "s"} · ${s.kcal} kcal · macros and foods</span></span>
+      <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></summary>
+    <div class="mdetail">
     <div class="mmacros">${[NUTS[0], ...shownNuts()].map(n => `<div class="mmac">
       <div class="mmh"><span><span class="dot" style="background:var(--${n.k})"></span>${n.label}</span><b>${n.k === "kcal" ? Math.round(s.t.kcal) : r1(s.t[n.k])}<small>${n.k === "kcal" ? " kcal" : " g"}</small></b></div>
       <div class="track"><div class="fill" style="width:${Math.min(100, pct(n.k))}%;--c:var(--${n.k})"></div></div>
       <span class="mpct">${pct(n.k)}% of daily goal</span></div>`).join("")}</div>
-    <h4 class="ptitle">In ${m.toLowerCase()}</h4>
     <ul class="items">${s.list.map(e => itemRow(e, todayKey())).join("")}</ul>
-  </div>`;
+  </div></details>`;
 }
+// Remember whether the fold is open, so removing a food or adding one doesn't snap it shut
+document.addEventListener("toggle", e => { if (e.target.id === "mealFold") state.foldOpen = e.target.open; }, true);
 // Draw the blocks (or the open meal with three squares). The input area itself is a fixed element that is
 // moved into the open block, so whatever you've typed survives redraws.
 function renderPicker(animate = false) {
@@ -2304,7 +2319,7 @@ function fillPicker(open) {
 }
 function openComposer(m, animate = true) {
   if (state.composing && state.meal === m) return;
-  state.meal = m; state.composing = true;
+  state.meal = m; state.composing = true; state.foldOpen = false;
   renderPicker(animate); renderMeals(); renderRecs();
   if (animate) setTimeout(() => $("foodText").focus({ preventScroll: true }), 430);
 }
