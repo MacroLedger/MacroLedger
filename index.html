@@ -311,6 +311,14 @@ details.meal > .items { border-left: 2px solid var(--accent-soft); margin-left: 
 .mmac .track { height: 7px; margin: 5px 0 3px; }
 .mpct { font-size: .72rem; color: var(--muted); }
 .mdetail .items { border: 1px solid var(--line); border-radius: 12px; }
+/* Filling in an earlier day from History */
+.pastbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; font-size: .9rem;
+  background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.pastbar[hidden] { display: none; }
+.pastbar svg { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; }
+.pastbar span { flex: 1; }
+.addpast { font-size: .85rem; margin-left: auto; }
+details.meal > .addpast { display: block; margin: 6px 0 10px 16px; }
 .mfold { border: 1px solid var(--line); border-radius: 14px; }
 .mfold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 13px; }
 .mfold > summary::-webkit-details-marker { display: none; }
@@ -827,6 +835,11 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
     <div class="page-head">
       <div><h2 class="page-title">Log</h2><div class="hint" id="log-date"></div></div>
       <span class="status" id="log-left"></span>
+    </div>
+    <div class="pastbar" id="logPast" role="status" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+      <span>Adding to <b id="logPastDay"></b></span>
+      <button class="linkbtn" data-logtoday type="button">Back to today</button>
     </div>
 
     <section class="card composer" id="composer" aria-label="Log food">
@@ -2058,8 +2071,11 @@ function addResult(i) {
 }
 
 /* ---------- Mutations ---------- */
+// The day the Log page adds to: today, or an earlier day picked from History ("Add food" there)
+const logKey = () => (state.logDate && state.logDate < todayKey() ? state.logDate : todayKey());
+const mealWhere = meal => (logKey() === todayKey() ? meal : `${meal} on ${shortDate(logKey())}`);
 function addEntries(items, meal) {
-  const date = todayKey();
+  const date = logKey();
   const list = state.days[date] = (state.days[date] || []).slice();
   for (const it of items) {
     const { note, bread, ...rest } = it; // the size picker's data isn't needed once logged
@@ -2113,9 +2129,12 @@ function render() {
   renderSummary("home", today);
   $("home-total").innerHTML = homeTotal(today);
 
-  // Log
-  const left = g.kcal - totals(state.days[today] || []).kcal;
-  $("log-date").textContent = longDate(today);
+  // Log (today, or the earlier day you're filling in)
+  const lk = logKey(), past = lk !== today;
+  const left = g.kcal - totals(state.days[lk] || []).kcal;
+  $("log-date").textContent = longDate(lk);
+  $("logPast").hidden = !past;
+  if (past) $("logPastDay").textContent = `${dayName(lk)}, ${parseKey(lk).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
   $("log-left").textContent = left >= 0 ? `${Math.round(left)} kcal left` : `${Math.round(-left)} kcal over`;
   $("log-left").classList.toggle("over", left < 0);
 
@@ -2224,10 +2243,13 @@ function mealsHTML(date, scope) {
   const anything = entries.length > 0;
   const title = scope === "log" ? "Today's meals" : `${esc(dayName(date))}'s meals`;
   const head = `<div class="sect-head"><h2 class="sect-title">${title}</h2><span class="hint">${entries.length} item${entries.length === 1 ? "" : "s"}${anything ? " · tap a meal to see its foods" : ""}</span></div>`;
-  if (!anything && scope === "hist") return head + `<div class="empty">Nothing was logged on this day.</div>`;
+  // On History, each meal can be filled in after the fact (opens Log for that day and meal)
+  const addBtn = m => (scope === "hist" ? `<button class="linkbtn addpast" data-addpast="${m}">+ Add food</button>` : "");
+  if (!anything && scope === "hist") return head + `<div class="empty">Nothing was logged on this day. Forgot to log? Add it to a meal:</div>`
+    + MEALS.map(m => `<div class="meal-empty"><h3>${m}</h3>${addBtn(m)}</div>`).join("");
   return head + MEALS.map(m => {
     const list = entries.filter(e => e.meal === m);
-    if (!list.length) return `<div class="meal-empty"><h3>${m}</h3><span class="empty" style="padding:0">${!anything && m === state.meal ? "Nothing yet. Describe a meal above and press Estimate." : "Nothing logged."}</span></div>`;
+    if (!list.length) return `<div class="meal-empty"><h3>${m}</h3><span class="empty" style="padding:0">${!anything && m === state.meal ? "Nothing yet. Describe a meal above and press Estimate." : "Nothing logged."}</span>${addBtn(m)}</div>`;
     const mt = totals(list), box = `${scope}:${m}`;
     return `<details class="meal" data-meal-box="${box}" ${state.openMeals.has(box) ? "open" : ""}>
       <summary class="meal-head" aria-label="${m}: ${Math.round(mt.kcal)} kcal, ${list.length} item${list.length === 1 ? "" : "s"}. Show foods">
@@ -2237,6 +2259,7 @@ function mealsHTML(date, scope) {
         ${macroLine(mt)}
       </summary>
       <ul class="items">${list.map(e => itemRow(e, date)).join("")}</ul>
+      ${addBtn(m)}
     </details>`;
   }).join("") + (anything && scope === "hist" ? factsPanel(totals(entries)) : "");
 }
@@ -2252,7 +2275,7 @@ const MEAL_ICONS = {
 };
 const mealIcon = m => `<span class="micon"><svg viewBox="0 0 24 24" aria-hidden="true">${MEAL_ICONS[m]}</svg></span>`;
 function mealSoFar(m) {
-  const list = (state.days[todayKey()] || []).filter(e => e.meal === m), t = totals(list);
+  const list = (state.days[logKey()] || []).filter(e => e.meal === m), t = totals(list);
   return { n: list.length, kcal: Math.round(t.kcal), t, list };
 }
 // Inside an open meal: a fold (closed by default, so the input stays near the top) with each macro against
@@ -2269,7 +2292,7 @@ function mealDetailHTML(m) {
       <div class="mmh"><span><span class="dot" style="background:var(--${n.k})"></span>${n.label}</span><b>${n.k === "kcal" ? Math.round(s.t.kcal) : r1(s.t[n.k])}<small>${n.k === "kcal" ? " kcal" : " g"}</small></b></div>
       <div class="track"><div class="fill" style="width:${Math.min(100, pct(n.k))}%;--c:var(--${n.k})"></div></div>
       <span class="mpct">${pct(n.k)}% of daily goal</span></div>`).join("")}</div>
-    <ul class="items">${s.list.map(e => itemRow(e, todayKey())).join("")}</ul>
+    <ul class="items">${s.list.map(e => itemRow(e, logKey())).join("")}</ul>
   </div></details>`;
 }
 // Remember whether the fold is open, so removing a food or adding one doesn't snap it shut
@@ -2333,6 +2356,16 @@ document.addEventListener("click", e => {
   // From Home: go to Log with that meal (or the one for this time of day) already open for typing
   const lm = t.closest("[data-logmeal]");
   if (lm) { go("log"); openComposer(lm.dataset.logmeal || defaultMeal(), false); setTimeout(() => $("foodText").focus(), 50); return; }
+  // From History: fill in a meal on that earlier day
+  const ap = t.closest("[data-addpast]");
+  if (ap) {
+    const day = state.histDate;
+    go("log");
+    state.logDate = day < todayKey() ? day : null; state.composing = false; state.pending = null;
+    render(); openComposer(ap.dataset.addpast, false); renderPreview();
+    setTimeout(() => $("foodText").focus(), 50); return;
+  }
+  if (t.closest("[data-logtoday]")) { state.logDate = null; state.pending = null; render(); renderPreview(); toast("Back to logging today"); return; }
   const open = t.closest("[data-mopen]");
   if (open) { openComposer(open.dataset.mopen); return; }
   if (t.closest("[data-mclose]")) closeComposer();
@@ -2413,7 +2446,7 @@ function renderNote() {
 // Looks back 8 weeks. Foods eaten on the same weekday weigh most, then the
 // neighbouring weekdays and the last few days; everything else counts a little.
 function recommend() {
-  const date = todayKey(), g = state.goals;
+  const date = logKey(), g = state.goals;
   const todays = state.days[date] || [];
   const t = totals(todays);
   const rem = Object.fromEntries(NUTS.map(n => [n.k, (g[n.k] || 0) - t[n.k]]));
@@ -3685,6 +3718,8 @@ function showPages() {
 function switchTab(next, animate = true) {
   const order = TABS[state.mode], prev = currentTab();
   if (state.mode === "main") state.page = next; else if (state.mode === "weight") state.wpage = next; else state.setTab = next;
+  // Leaving Log ends filling in an earlier day, so the next visit logs to today again
+  if (state.logDate && !(state.mode === "main" && next === "log")) { state.logDate = null; render(); }
   showPages(); renderTabs();
   if (next === "whome") renderWeightChart(); // the chart sizes itself to the page, which was hidden until now
   const el = $("page-" + next);
@@ -3819,7 +3854,7 @@ $("recs").addEventListener("click", e => {
   const r = b && state.recs[Number(b.dataset.rec)];
   if (!r) return;
   addEntries([r.item], state.meal);
-  toast(`Added ${r.item.name} to ${state.meal}`);
+  toast(`Added ${r.item.name} to ${mealWhere(state.meal)}`);
 });
 $("preview").addEventListener("change", e => {
   const id = e.target.dataset.serv;
@@ -3850,7 +3885,7 @@ $("preview").addEventListener("click", e => {
     const n = state.pending.length, meal = state.meal;
     addEntries(state.pending, meal);
     state.pending = null; $("foodText").value = ""; $("missed").innerHTML = ""; setMsg(""); renderPreview();
-    toast(`Added ${n} item${n === 1 ? "" : "s"} to ${meal}`);
+    toast(`Added ${n} item${n === 1 ? "" : "s"} to ${mealWhere(meal)}`);
   }
   if (e.target.id === "discardPending") { state.pending = null; $("missed").innerHTML = ""; setMsg(""); renderPreview(); }
 });
@@ -3866,7 +3901,7 @@ $("manualAdd").onclick = () => {
   addEntries([makeItem(name, base, 1, "Entered by you")], state.meal);
   ["m-name", "m-portion", ...NUTS.map(n => "m-" + n.k)].forEach(id => { $(id).value = ""; });
   $("manual").hidden = true;
-  toast(`Added ${name} to ${state.meal}`);
+  toast(`Added ${name} to ${mealWhere(state.meal)}`);
 };
 
 renderTabs();
